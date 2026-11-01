@@ -35,3 +35,7 @@ write `prediction.json`, then submit H + measure on all qubits at once and archi
 ## 2026-11-01
 
 From spike 0015: one 4,096-shot job resolves ±0.78% per qubit, but the median predicted bias is −0.44%, so only ~9 of 156 qubits would stand out. Plan ~10⁵ shots per qubit, check the per-job shot limit and cost before submitting, and get approval for the budget. All-qubit job cost is still unmeasured.
+
+## 2026-11-01
+
+From spike 0018: record two predictions per qubit, readout-only (the model) and readout + measurement-window decay (the double-counting alternative). The chip map then tests which one the hardware agrees with.
