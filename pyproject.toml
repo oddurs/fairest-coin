@@ -46,6 +46,8 @@ filterwarnings = ["error"]
 dev = [
     "hypothesis>=6.170.14",
     "pytest>=9.2.0",
+    "qiskit>=2.6.1",
+    "qiskit-qasm3-import>=0.6.0",
     "ruff>=0.17.3",
     "ty>=0.0.95",
 ]

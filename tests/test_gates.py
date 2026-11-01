@@ -1,7 +1,13 @@
+from collections.abc import Callable
+
 import numpy as np
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
+from qiskit import QuantumCircuit
+from qiskit.circuit import Gate as QiskitGate
+from qiskit.circuit import library
+from qiskit.quantum_info import Operator
 
 from coin import gates
 from coin.circuit import ARITY, Gate
@@ -142,3 +148,48 @@ def test_rotation_is_exp_of_its_pauli(name: str, theta: float) -> None:
 @pytest.mark.parametrize("name", sorted(ROTATION_AXES))
 def test_half_turn_rotation_is_its_pauli_up_to_minus_i(name: str) -> None:
     assert close(matrix(Gate(name, (0,), (np.pi,))), -1j * ROTATION_AXES[name])
+
+
+# Qiskit's own gate classes, by our name: a second, independent source for every matrix.
+QISKIT: dict[str, Callable[..., QiskitGate]] = {
+    "i": library.IGate,
+    "x": library.XGate,
+    "y": library.YGate,
+    "z": library.ZGate,
+    "h": library.HGate,
+    "s": library.SGate,
+    "sdg": library.SdgGate,
+    "t": library.TGate,
+    "sx": library.SXGate,
+    "rx": library.RXGate,
+    "ry": library.RYGate,
+    "rz": library.RZGate,
+    "cx": library.CXGate,
+    "cz": library.CZGate,
+}
+
+
+def test_qiskit_mapping_covers_every_gate() -> None:
+    assert set(QISKIT) == set(ARITY)
+
+
+@pytest.mark.parametrize("name", sorted(QISKIT))
+def test_matrix_matches_qiskit_exactly(name: str) -> None:
+    n_qubits, n_params = ARITY[name]
+    params = (0.7,) * n_params
+    ours = matrix(Gate(name, tuple(range(n_qubits)), params))
+    assert close(ours, np.asarray(Operator(QISKIT[name](*params)).data))
+
+
+@pytest.mark.parametrize("name", sorted(n for n, (k, _) in ARITY.items() if k == 2))
+@pytest.mark.parametrize("qubits", [(0, 1), (1, 0)])
+def test_two_qubit_order_matches_a_qiskit_circuit(name: str, qubits: tuple[int, int]) -> None:
+    # Our matrix acts on |q_b q_a⟩ for qubits (a, b); a Qiskit circuit's operator always acts
+    # on |q1 q0⟩. They agree as they stand for (0, 1), and up to a swap of the two factors
+    # for (1, 0); a big-endian slip in either library would break one of the two.
+    circuit = QuantumCircuit(2)
+    circuit.append(QISKIT[name](), list(qubits))
+    swap = np.eye(4)[[0, 2, 1, 3]]
+    ours = matrix(Gate(name, qubits))
+    expected = ours if qubits == (0, 1) else swap @ ours @ swap
+    assert close(np.asarray(Operator(circuit).data), expected)
