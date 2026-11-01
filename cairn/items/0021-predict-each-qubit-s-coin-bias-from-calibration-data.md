@@ -34,3 +34,7 @@ density simulator for each qubit.
 - [ ] A qubit with zero errors predicts exactly 0.5
 - [ ] Qubits missing a calibration field are reported, not silently given defaults
 - [ ] `coin predict --calibration FILE` prints a per-qubit table sorted by predicted bias
+
+## 2026-11-01
+
+From spike 0018: model = readout confusion (prob_meas1_prep0, prob_meas0_prep1) + thermal relaxation over each gate's length (+ depolarizing gate error for generality; zero effect on the coin). Do NOT add T1 over the measurement window: the readout calibration already contains it. In the 2026-11-01 snapshot, qubits 82/94/130 lack T1 or T2, 20/83 have T2 > 2·T1, and six lack init_error; report them, never default.
