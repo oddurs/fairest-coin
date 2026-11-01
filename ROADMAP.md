@@ -8,7 +8,7 @@
 
 `coin flip --sim` flips a coin on a simulator written from scratch, and chapters 0–1
 
-### backlog
+### in progress
 
 - [ ] [`0014`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0014-cut-v0-1-0.md) Cut v0.1.0 <sup>chore · p0 · tooling</sup>
 
