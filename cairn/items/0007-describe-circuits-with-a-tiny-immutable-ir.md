@@ -3,10 +3,12 @@ id: 7
 uid: 13d690c2-2c82-4658-b5aa-ead97abad1dc
 title: Describe circuits with a tiny immutable IR
 type: feature
-status: backlog
+status: done
 milestone: v0.1
+assignee: Oddur Sigurdsson
 created: 2026-11-01
 updated: 2026-11-01
+closed_at: 2026-11-01
 priority: p0
 effort: s
 area: sim
@@ -25,7 +27,7 @@ circuits (`c.h(0).measure(0, 0)`). No execution logic lives here.
 
 ## Acceptance criteria
 
-- [ ] `Circuit(1).h(0).measure(0, 0)` builds the coin; the original circuit is unchanged
-- [ ] Referencing a qubit outside `range(n_qubits)` raises `ValueError` naming the qubit
-- [ ] A gate given the wrong number of qubits or parameters raises `ValueError`
-- [ ] Circuits compare equal by value and are hashable
+- [x] `Circuit(1).h(0).measure(0, 0)` builds the coin; the original circuit is unchanged
+- [x] Referencing a qubit outside `range(n_qubits)` raises `ValueError` naming the qubit
+- [x] A gate given the wrong number of qubits or parameters raises `ValueError`
+- [x] Circuits compare equal by value and are hashable
