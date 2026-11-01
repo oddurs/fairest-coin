@@ -15,7 +15,8 @@ import pytest
 from coin.cli import main
 
 ROOT = Path(__file__).resolve().parent.parent
-CHAPTERS = sorted((ROOT / "docs" / "chapters").glob("*.md"))
+# The README quotes commands too, so it is held to the same standard as a chapter.
+CHAPTERS = [ROOT / "README.md", *sorted((ROOT / "docs" / "chapters").glob("*.md"))]
 
 EXCERPT = re.compile(r"<!-- from: (?P<path>\S+) -->\n```python\n(?P<code>.*?)```", re.S)
 PYCON = re.compile(r"```pycon\n(.*?)```", re.S)

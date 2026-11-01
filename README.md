@@ -8,19 +8,37 @@
 A tossed coin is deterministic physics: it lands on the side it started on slightly more
 often than half the time. A pseudo-random generator is deterministic by design. Statistical
 tests can only fail to find a pattern; they can never prove there isn't one. Quantum
-mechanics is the one place where randomness comes with a proof, and the proof needs
+mechanics is the one place where randomness can come with a proof, and the proof needs
 entanglement.
 
-This project builds a quantum coin from nothing — its own simulator, noise model and
-compiler — and runs it on real IBM quantum hardware, asking the same question more
-rigorously in each chapter. Every chapter predicts before it measures, every hardware run
-is archived with the calibration data of that day, and the final coin hands out bits with
-a receipt: the job, the qubit, and the Bell-inequality violation that certifies them.
+This project builds a quantum coin from nothing, with its own simulator, noise model and
+compiler, and is working towards running it on real IBM quantum hardware, asking the same
+question more rigorously in each chapter. Each chapter predicts before it measures. The
+last one ends with a coin whose every flip carries a receipt: the job, the qubit, and the
+Bell-inequality violation that certifies it.
 
-## Status
+## Quickstart
 
-The project has just started. Today `coin` is an installable command with no experiments
-yet. The plan, milestone by milestone, is in [ROADMAP.md](ROADMAP.md).
+Requires [uv](https://docs.astral.sh/uv/).
+
+```sh
+uv tool install git+https://github.com/oddurs/fairest-coin
+coin flip --sim
+```
+
+`coin flip --sim` prints `HEADS` or `TAILS`. Flip it ten thousand times, reproducibly:
+
+```console
+$ coin flip --sim --shots 10000 --seed 1
+heads   4,971   49.71%
+tails   5,029   50.29%
+```
+
+Today the coin runs on a statevector simulator written from scratch in `src/coin/`, so
+its flips come from a seeded pseudo-random generator. [Chapter 1](docs/chapters/01-the-ideal-coin.md)
+explains why that is not good enough. Real hardware arrives in v0.2.
+
+## The chapters
 
 | Chapter | Question | Status |
 |---|---|---|
@@ -32,14 +50,9 @@ yet. The plan, milestone by milestone, is in [ROADMAP.md](ROADMAP.md).
 | 5. The proof | Can randomness be certified? | upcoming in v0.4 |
 | Epilogue | What would it really take? | upcoming in v1.0 |
 
-## Install
-
-Requires [uv](https://docs.astral.sh/uv/).
-
-```sh
-uv tool install git+https://github.com/oddurs/fairest-coin
-coin --version
-```
+Every example, code excerpt and command in the chapters is run by the test suite, so the
+essay cannot drift from the code. The plan, milestone by milestone, is in
+[ROADMAP.md](ROADMAP.md).
 
 ## Development
 
