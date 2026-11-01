@@ -1,5 +1,6 @@
 import math
 from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -76,3 +77,27 @@ def test_circuits_are_values() -> None:
     assert hash(a) == hash(b)
     assert a != Circuit(2).h(1).cx(0, 1)
     assert len({a, b}) == 1
+
+
+@pytest.mark.parametrize("angle", [math.nan, math.inf, -math.inf])
+def test_non_finite_angle_is_rejected(angle: float) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        Circuit(1).rx(angle, 0)
+
+
+# Deliberately ill-typed, as a caller without a type checker might pass.
+FLOAT_INDEX: Any = 1.0
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: Circuit(2).h(FLOAT_INDEX),
+        lambda: Circuit(2).h(True),
+        lambda: Circuit(2).measure(0, FLOAT_INDEX),
+        lambda: Circuit(FLOAT_INDEX + 1),
+    ],
+)
+def test_non_integer_index_is_rejected(build: Callable[[], object]) -> None:
+    with pytest.raises(ValueError, match="integer"):
+        build()
