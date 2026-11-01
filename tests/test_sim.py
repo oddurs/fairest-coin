@@ -3,6 +3,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from coin import sim
 from coin.circuit import ARITY, Circuit, Gate
 from coin.gates import matrix
 from coin.sim import probabilities, sample, simulate
@@ -150,3 +151,11 @@ def test_circuit_without_measurement_has_no_outcomes() -> None:
 def test_shots_must_be_positive(shots: int) -> None:
     with pytest.raises(ValueError, match="at least 1"):
         sample(COIN, shots, np.random.default_rng(0))
+
+
+def test_cutoff_applies_to_whole_outcomes(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Outcome '0' is two basis states of 0.25 each. With the cutoff raised to 0.3 neither
+    # state clears it alone, but the outcome, at 0.5, must survive.
+    monkeypatch.setattr(sim, "NEGLIGIBLE", 0.3)
+    result = probabilities(Circuit(2).h(0).h(1).measure(0, 0))
+    assert result == pytest.approx({"00": 0.5, "01": 0.5}, abs=EXACT)

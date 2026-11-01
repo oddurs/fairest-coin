@@ -3,10 +3,12 @@ id: 62
 uid: a858a109-5e90-47c7-8f75-98be3a202dc7
 title: Apply the negligible cutoff per outcome, and only build occurring outcomes
 type: bug
-status: backlog
+status: done
 milestone: v0.2
+assignee: Oddur Sigurdsson
 created: 2026-11-01
 updated: 2026-11-01
+closed_at: 2026-11-01
 priority: p1
 effort: s
 area: sim
@@ -31,3 +33,11 @@ only for indices with nonzero probability or counts.
 2. A test with an outcome split across many sub-cutoff amplitudes demonstrates it.
 
 Found by the v0.1 milestone review; defect in 0009.
+
+## 2026-11-01
+
+20-qubit circuit, same machine: probabilities 1.326s → 0.036s, sample 1.333s → 0.046s, because outcome strings are now built only for occurring basis states. The per-outcome cutoff bug needs ~40 qubits to show naturally, so its test raises NEGLIGIBLE to 0.3 via monkeypatch; it returned {} before the fix.
+
+## Result
+
+coin.sim: probabilities() sums basis states per outcome, then drops outcomes ≤ NEGLIGIBLE; outcome strings are built per occurring index by _outcome(index, readout, n), with _readout(circuit) mapping clbit → last-measured qubit. ~37× faster at 20 qubits.
