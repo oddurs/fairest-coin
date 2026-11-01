@@ -4,13 +4,9 @@
 
 ## v0.1 — The ideal coin
 
-`#########·` 88% · 7 of 8 done · due 2026-11-08
+`##########` 100% · 8 of 8 done · due 2026-11-08
 
 `coin flip --sim` flips a coin on a simulator written from scratch, and chapters 0–1
-
-### in progress
-
-- [ ] [`0014`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0014-cut-v0-1-0.md) Cut v0.1.0 <sup>chore · p0 · tooling</sup>
 
 ### done
 
@@ -21,6 +17,7 @@
 - [x] [`0011`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0011-write-chapter-0-your-coin-is-unfair.md) Write chapter 0: your coin is unfair <sup>docs · p0 · essay</sup>
 - [x] [`0012`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0012-write-chapter-1-the-ideal-coin.md) Write chapter 1: the ideal coin <sup>docs · p0 · essay</sup>
 - [x] [`0013`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0013-make-the-readme-the-spine-of-the-essay.md) Make the README the spine of the essay <sup>docs · p0 · essay</sup>
+- [x] [`0014`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0014-cut-v0-1-0.md) Cut v0.1.0 <sup>chore · p0 · tooling</sup>
 
 ## v0.2 — The real coin
 
