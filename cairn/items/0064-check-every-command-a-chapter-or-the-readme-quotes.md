@@ -3,10 +3,12 @@ id: 64
 uid: bf68f698-0753-4c72-9c7b-ebce2a0a76e6
 title: Check every command a chapter or the README quotes
 type: bug
-status: backlog
+status: done
 milestone: v0.2
+assignee: Oddur Sigurdsson
 created: 2026-11-01
 updated: 2026-11-01
+closed_at: 2026-11-01
 priority: p1
 effort: s
 area: essay
@@ -29,3 +31,11 @@ expected output; `--version` and `--help` work; the README's quickstart flip is 
 1. Add a console block with `$ coin --version` to a chapter: the test errors with SystemExit.
 
 Found by the v0.1 milestone review; defect in 0012 and 0013.
+
+## 2026-11-01
+
+Reproduced before the fix with a probe chapter holding a correct two-command block ('coin flip --sim --seed 1' then 'coin --version'): the old checker failed it, reading the second command as output. Regression tests build that block in memory (with the live __version__) so they never go stale.
+
+## Result
+
+tests/test_chapters.py: check_console() runs every '$ coin ...' line of every console block, expected output = lines up to the next '$'; run_coin() turns argparse SystemExit into an exit code. README quickstart flip is now a seeded console block ('coin flip --sim --seed 1' → HEADS), so both README commands are checked.

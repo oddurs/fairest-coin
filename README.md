@@ -23,12 +23,14 @@ Requires [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv tool install git+https://github.com/oddurs/fairest-coin
-coin flip --sim
 ```
 
-`coin flip --sim` prints `HEADS` or `TAILS`. Flip it ten thousand times, reproducibly:
+Flip the coin once, then ten thousand times. `--seed` makes a run replayable; leave it off
+for a fresh flip.
 
 ```console
+$ coin flip --sim --seed 1
+HEADS
 $ coin flip --sim --shots 10000 --seed 1
 heads   4,971   49.71%
 tails   5,029   50.29%
