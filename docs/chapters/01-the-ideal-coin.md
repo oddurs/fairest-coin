@@ -81,7 +81,9 @@ experiments as circuits: a list of gates and measurements on numbered qubits.
 Those numbers are tidier than the arithmetic behind them. The amplitudes are 1/√2, which no
 computer stores exactly, and the probabilities come out a hair off before the simulator
 renormalises them and drops anything smaller than 10⁻¹² as rounding noise. That is why every
-test in this project compares numbers with a stated tolerance, never with `==`.
+test in this project compares computed numbers with a stated tolerance, never with `==`.
+The examples in these chapters are the one exception: they check what you would see
+printed, digit for digit.
 
 ```pycon
 >>> from coin.sim import simulate
