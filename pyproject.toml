@@ -7,7 +7,9 @@ license = "MIT"
 license-files = ["LICENSE"]
 authors = [{ name = "Oddur Sigurdsson", email = "oddurs@gmail.com" }]
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "numpy>=2.5.4",
+]
 
 [project.scripts]
 coin = "coin.cli:main"
@@ -25,7 +27,13 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "N", "PT", "C4", "PL"]
-ignore = ["PLR2004"]
+# Physics notation (θ, σ, ⟩, ×) belongs in docstrings and comments. String literals stay
+# checked (RUF001), since that is where a lookalike character would change behaviour.
+ignore = ["PLR2004", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+# `I` is the identity matrix in every textbook; renaming it would hurt more than it helps.
+"src/coin/gates.py" = ["E741"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -34,6 +42,7 @@ filterwarnings = ["error"]
 
 [dependency-groups]
 dev = [
+    "hypothesis>=6.170.14",
     "pytest>=9.2.0",
     "ruff>=0.17.3",
     "ty>=0.0.95",
