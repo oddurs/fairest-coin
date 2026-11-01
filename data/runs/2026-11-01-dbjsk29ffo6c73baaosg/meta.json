@@ -1,0 +1,36 @@
+{
+  "backend": "ibm_marrakesh",
+  "finished_at": "2026-11-01T23:24:00+00:00",
+  "job_id": "dbjsk29ffo6c73baaosg",
+  "qiskit_ibm_runtime": "0.51.0",
+  "quantum_seconds": null,
+  "qubit": 139,
+  "shots": 4096,
+  "submitted_at": "2026-11-01T23:23:52+00:00",
+  "timestamps": {
+    "created": "2026-11-01T23:23:53.685108Z",
+    "finished": "2026-11-01T23:24:00.462827Z",
+    "running": "2026-11-01T23:23:55.32941Z"
+  },
+  "transpiled_ops": {
+    "measure": 1,
+    "rz": 2,
+    "sx": 1
+  },
+  "usage": {
+    "details": [
+      {
+        "metric": {
+          "id": "caffe3ca-729c-5750-8777-df63bbf8bfd9",
+          "value": 3
+        },
+        "unit": "resource_units",
+        "value": 0.046368
+      }
+    ],
+    "qpu_charge_time_seconds": 3,
+    "status": "pending",
+    "unit": "resource_units",
+    "value": 0.046368
+  }
+}

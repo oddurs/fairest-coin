@@ -24,6 +24,8 @@ module-name = "coin"
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+# Archived runs keep the exact script that produced them; they are records, not code.
+extend-exclude = ["data"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "N", "PT", "C4", "PL"]
@@ -47,3 +49,6 @@ dev = [
     "ruff>=0.17.3",
     "ty>=0.0.95",
 ]
+
+[tool.ty.src]
+exclude = ["data"]

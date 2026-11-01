@@ -1,0 +1,11 @@
+{
+  "expected_tails": 2046.0,
+  "model": "ideal H, then the qubit's calibrated readout confusion; gate error and decay before measurement ignored (absorbed into readout calibration)",
+  "p_tails": 0.49951171875,
+  "prob_meas0_prep1": 0.001953125,
+  "prob_meas1_prep0": 0.0009765625,
+  "qubit": 139,
+  "shots": 4096,
+  "sigma_tails": 31.9999847412073,
+  "written_at": "2026-11-01T23:17:58+00:00"
+}
