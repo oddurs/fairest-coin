@@ -20,3 +20,6 @@ build/
 .idea/
 .vscode/
 *.swp
+
+# Hypothesis keeps a local database of examples it has tried
+.hypothesis/

@@ -47,3 +47,7 @@ Decomposition: strip phase to SU(2), read theta=2*atan2(|b|,|a|) (atan2 stays ac
 ## Result
 
 coin/compile.py: lower(Circuit)->Circuit merges each run of consecutive single-qubit gates per qubit into one unitary and emits at most rz,sx,rz,sx,rz (one rz if diagonal, rz+x if antidiagonal, rz,sx,rz if theta=pi/2; identity rz dropped; rz angles in (-pi, pi]); cx/cz and measurements pass through in place. Equal up to global phase within 1e-11 (SNAP=1e-12 snapping). H -> rz(pi/2), sx, rz(pi/2). to_qasm(Circuit)->str emits OpenQASM 3 on virtual qubit[n] q / bit[n] c with repr angles, accepts only NATIVE={rz,sx,x,cz} plus measure, else ValueError naming the gate (so cx must be lowered by 0037 first). Physical layout is not in the QASM: pass it to transpile(initial_layout=..., optimization_level=0). Qiskit is a dev-only dependency; library code still never imports it.
+
+## 2026-11-01
+
+Independent review: 20,000 Haar-random unitaries round-trip through to_qasm, qasm3.loads and Operator within 1e-15; no correctness bug. Three weak tests let mutants survive (snap at θ≈π widened, small rz dropped, cx added to NATIVE); fixed with hand-written cases, and all three mutants are now killed by the intended tests. .hypothesis/ is now gitignored.

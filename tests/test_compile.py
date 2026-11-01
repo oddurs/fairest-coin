@@ -215,7 +215,13 @@ def test_qasm_for_the_coin() -> None:
     )
 
 
-@pytest.mark.parametrize("name", sorted(set(ARITY) - NATIVE))
+def test_the_native_set_is_ibms() -> None:
+    # Written out by hand: deriving it from NATIVE would let a change to NATIVE pass unseen.
+    # Spike 0015 found these on all three Heron r2 backends.
+    assert {"rz", "sx", "x", "cz"} == NATIVE
+
+
+@pytest.mark.parametrize("name", sorted(set(ARITY) - {"rz", "sx", "x", "cz"}))
 def test_qasm_refuses_a_gate_outside_the_native_set(name: str) -> None:
     n_qubits, n_params = ARITY[name]
     circuit = Circuit(2).append(Gate(name, tuple(range(n_qubits)), (0.5,) * n_params))
@@ -263,3 +269,27 @@ def test_qasm_measurements_parse_to_the_right_bits() -> None:
 
 def test_lower_keeps_measurements() -> None:
     assert lower(Circuit(1).measure(0, 0)).ops == (Measure(0, 0),)
+
+
+def names(circuit: Circuit) -> list[str]:
+    return [op.name for op in circuit.ops if isinstance(op, Gate)]
+
+
+def test_a_rotation_just_short_of_a_half_turn_is_not_snapped_to_x() -> None:
+    # Outside the snap window θ ≈ π must keep the full form; turning it into x would run the
+    # wrong rotation on hardware.
+    angle = math.pi - 2 * SNAP
+    assert names(lower(Circuit(1).rx(angle, 0))) == ["rz", "sx", "rz", "sx", "rz"]
+
+
+def test_a_small_real_rz_is_kept() -> None:
+    lowered = lower(Circuit(1).rz(2 * SNAP, 0))
+    assert names(lowered) == ["rz"]
+    gate = lowered.ops[0]
+    assert isinstance(gate, Gate)
+    assert gate.params[0] == pytest.approx(2 * SNAP, rel=1e-6)
+
+
+def test_qasm_keeps_two_qubit_operand_order() -> None:
+    # cz is symmetric, so only the text can show the order; it will matter for asymmetric gates.
+    assert "cz q[1], q[0];" in to_qasm(Circuit(2).cz(1, 0))
