@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Secrets: the IBM API key never enters the repository
+.env
+.env.*
+
+# Worktrees live beside the repo, but never inside it
+.worktrees/
+
+# OS and editors
+.DS_Store
+.idea/
+.vscode/
+*.swp

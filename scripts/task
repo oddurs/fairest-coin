@@ -1,0 +1,30 @@
+#!/bin/sh
+# The one interface CI, hooks and agents use. Only this file knows the toolchain.
+set -eu
+
+cd "$(dirname "$0")/.."
+
+run() {
+  echo "→ $*"
+  "$@"
+}
+
+task() {
+  case "$1" in
+    fmt) run uv run --frozen ruff format . && run uv run --frozen ruff check --fix . ;;
+    fmt:check) run uv run --frozen ruff format --check . ;;
+    lint) run uv run --frozen ruff check . && run uv run --frozen ty check --error-on-warning ;;
+    test) run uv run --frozen pytest ;;
+    # A pure library: building the wheel is the build, and proves packaging works.
+    build) run uv build --quiet --out-dir "${TMPDIR:-/tmp}/fairest-coin-dist" ;;
+    check) task fmt:check && task lint && task test && task build ;;
+    *)
+      echo "✗ unknown task: $1" >&2
+      echo "usage: scripts/task {fmt|fmt:check|lint|test|build|check}" >&2
+      exit 2
+      ;;
+  esac
+}
+
+[ $# -eq 1 ] || { echo "usage: scripts/task {fmt|fmt:check|lint|test|build|check}" >&2; exit 2; }
+task "$1"

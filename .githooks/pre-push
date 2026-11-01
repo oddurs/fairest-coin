@@ -1,0 +1,26 @@
+#!/bin/sh
+# The default branch advances only through a merged pull request; nothing red leaves.
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+remote=$1
+if ref=$(git symbolic-ref --quiet --short "refs/remotes/$remote/HEAD" 2>/dev/null); then
+  default=${ref#"$remote"/}
+else
+  default=$(git ls-remote --symref "$remote" HEAD | awk '/^ref:/ {sub("refs/heads/", "", $2); print $2}')
+fi
+[ -n "$default" ] || { echo "✗ cannot resolve the default branch of $remote" >&2; exit 1; }
+zero=0000000000000000000000000000000000000000
+
+pushing=0
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/$default" ]; then
+    echo "✗ refusing to push to $default — open a pull request: scripts/agent pr" >&2
+    exit 1
+  fi
+  [ "$local_sha" = "$zero" ] || pushing=1
+done
+
+# Deleting a remote branch pushes no code, so there is nothing to check.
+[ "$pushing" -eq 1 ] || exit 0
+"$root/scripts/task" check

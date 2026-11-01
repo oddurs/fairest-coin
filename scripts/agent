@@ -1,0 +1,202 @@
+#!/bin/sh
+# One unit of work, one worktree, one branch, one pull request.
+set -eu
+
+say() { echo "→ $*"; }
+die() {
+  echo "✗ $*" >&2
+  exit 1
+}
+
+# Always operate on the primary checkout, even when called from inside a worktree.
+common=$(git rev-parse --path-format=absolute --git-common-dir)
+root=$(dirname "$common")
+repo=$(basename "$root")
+trees=$(cd "$root/.." && pwd)/.worktrees/$repo
+branch_re='^(feat|fix|chore|docs|perf|refactor|test)/[a-z0-9][a-z0-9._-]*$'
+here=$(cd "$(dirname "$0")" && pwd)
+
+default_branch() {
+  if ! ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null); then
+    git remote set-head origin --auto >/dev/null 2>&1 || die "cannot resolve origin's default branch"
+    ref=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD)
+  fi
+  echo "${ref#origin/}"
+}
+
+current_branch() { git branch --show-current; }
+
+tree_of() {
+  git -C "$root" worktree list --porcelain |
+    awk -v b="refs/heads/$1" '/^worktree /{w=substr($0,10)} $0=="branch " b {print w}'
+}
+
+cmd_doctor() {
+  problems=0
+  bad() {
+    echo "✗ $*"
+    problems=$((problems + 1))
+  }
+  ok() { echo "✓ $*"; }
+
+  for tool in git gh uv; do
+    if command -v "$tool" >/dev/null 2>&1; then ok "$tool found"; else bad "$tool not on PATH"; fi
+  done
+  if gh auth status >/dev/null 2>&1; then ok "gh authenticated"; else bad "gh not authenticated — run: gh auth login"; fi
+  if git -C "$root" remote get-url origin >/dev/null 2>&1; then
+    ok "origin $(git -C "$root" remote get-url origin), default branch $(default_branch)"
+  else
+    bad "no origin remote"
+  fi
+
+  hp=$(git -C "$root" config --get core.hooksPath || echo "")
+  if [ "$hp" != ".githooks" ]; then
+    say "setting core.hooksPath to .githooks"
+    git -C "$root" config core.hooksPath .githooks
+  fi
+  ok "hooks path .githooks"
+  for h in commit-msg pre-commit pre-push; do
+    if [ -x "$root/.githooks/$h" ]; then ok "hook $h"; else bad ".githooks/$h missing or not executable"; fi
+  done
+  for s in task agent attribution; do
+    [ -x "$root/scripts/$s" ] || bad "scripts/$s missing or not executable"
+  done
+
+  if uv run --project "$root" --frozen python -c 'import coin' >/dev/null 2>&1; then
+    ok "python environment syncs and imports coin"
+  else
+    bad "python environment broken — run: uv sync"
+  fi
+
+  if [ -n "$(git -C "$root" status --porcelain)" ]; then
+    bad "primary checkout has uncommitted changes — work belongs in a worktree"
+  else
+    ok "primary checkout clean"
+  fi
+
+  [ "$problems" -eq 0 ] || die "$problems problem(s)"
+  echo "✓ doctor clean"
+}
+
+cmd_start() {
+  [ $# -eq 1 ] || die "usage: scripts/agent start <type>/<slug>"
+  branch=$1
+  echo "$branch" | grep -Eq "$branch_re" ||
+    die "branch '$branch' must match <type>/<slug>, type ∈ feat fix chore docs perf refactor test"
+  dir="$trees/$branch"
+  [ ! -e "$dir" ] || die "worktree already exists: $dir"
+  git -C "$root" show-ref --quiet --verify "refs/heads/$branch" && die "branch $branch already exists"
+  base=$(default_branch)
+  say "fetching origin"
+  git -C "$root" fetch --quiet origin
+  say "creating $branch from origin/$base at $dir"
+  mkdir -p "$(dirname "$dir")"
+  git -C "$root" worktree add --quiet --no-track -b "$branch" "$dir" "origin/$base"
+  echo "$dir"
+}
+
+cmd_check() { "$here/task" check; }
+
+cmd_commit() {
+  [ $# -ge 1 ] || die "usage: scripts/agent commit <conventional message>"
+  [ "$(current_branch)" != "$(default_branch)" ] || die "never commit to the default branch — scripts/agent start first"
+  say "staging all changes"
+  git add -A
+  git diff --cached --quiet && die "nothing to commit"
+  # The commit-msg hook validates the message; it runs here like anywhere else.
+  git commit -m "$*"
+}
+
+cmd_pr() {
+  draft=""
+  body=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --draft) draft="--draft" ;;
+      --body-file)
+        [ $# -ge 2 ] || die "--body-file needs a path"
+        body=$2
+        shift
+        ;;
+      *) die "usage: scripts/agent pr [--draft] [--body-file FILE]" ;;
+    esac
+    shift
+  done
+  branch=$(current_branch)
+  base=$(default_branch)
+  [ "$branch" != "$base" ] || die "refusing to open a PR from $base"
+  [ -z "$(git status --porcelain)" ] || die "uncommitted changes — commit or discard them first"
+  say "running checks"
+  "$here/task" check
+  say "pushing $branch"
+  git push --quiet -u origin "$branch"
+  if [ -n "$body" ]; then
+    "$here/attribution" "$body"
+    # The branch's first commit names the unit of work.
+    title=$(git log --format=%s "origin/$base..HEAD" | tail -n 1)
+    say "opening PR: $title"
+    # shellcheck disable=SC2086 # $draft is a flag or nothing
+    gh pr create --base "$base" --title "$title" --body-file "$body" $draft
+  else
+    say "opening PR from commit messages"
+    # shellcheck disable=SC2086
+    gh pr create --base "$base" --fill $draft
+  fi
+}
+
+cmd_sync() {
+  base=$(default_branch)
+  [ -z "$(git status --porcelain)" ] || die "uncommitted changes — commit or stash before syncing"
+  say "rebasing $(current_branch) onto origin/$base"
+  git fetch --quiet origin
+  git rebase "origin/$base"
+}
+
+cmd_done() {
+  branch=${1:-$(current_branch)}
+  base=$(default_branch)
+  [ "$branch" != "$base" ] || die "usage: scripts/agent done [<type>/<slug>] (not $base)"
+  state=$(gh pr view "$branch" --json state --jq .state 2>/dev/null) || die "no PR found for $branch"
+  [ "$state" = "MERGED" ] || die "PR for $branch is $state, not MERGED — merge it first"
+  dir=$(tree_of "$branch")
+  if [ -n "$dir" ]; then
+    [ -z "$(git -C "$dir" status --porcelain)" ] || die "$dir has uncommitted changes"
+    say "removing worktree $dir"
+    git -C "$root" worktree remove "$dir"
+  fi
+  if git -C "$root" show-ref --quiet --verify "refs/heads/$branch"; then
+    say "deleting local branch $branch"
+    # Squash merges leave the branch unmerged in git's eyes; the PR state above is the proof.
+    git -C "$root" branch --quiet -D "$branch"
+  fi
+  say "pruning"
+  git -C "$root" worktree prune
+  git -C "$root" fetch --quiet --prune origin
+  say "fast-forwarding $base"
+  git -C "$root" merge --quiet --ff-only "origin/$base"
+  echo "cd $root"
+}
+
+cmd_list() {
+  git -C "$root" worktree list --porcelain |
+    awk '/^worktree /{w=substr($0,10)} /^branch /{sub("refs/heads/","",$2); print $2 "\t" w}' |
+    while IFS="$(printf '\t')" read -r b w; do
+      pr=$(gh pr view "$b" --json number,state --jq '"#\(.number) \(.state)"' 2>/dev/null || echo "no PR")
+      printf '%-40s %-14s %s\n' "$b" "$pr" "$w"
+    done
+}
+
+[ $# -ge 1 ] || die "usage: scripts/agent {doctor|start|check|commit|pr|sync|done|list}"
+command=$1
+shift
+case "$command" in
+  doctor) cmd_doctor "$@" ;;
+  start) cmd_start "$@" ;;
+  check) cmd_check "$@" ;;
+  commit) cmd_commit "$@" ;;
+  pr) cmd_pr "$@" ;;
+  sync) cmd_sync "$@" ;;
+  done) cmd_done "$@" ;;
+  list) cmd_list "$@" ;;
+  *) die "unknown command '$command' — usage: scripts/agent {doctor|start|check|commit|pr|sync|done|list}" ;;
+esac

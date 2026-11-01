@@ -1,0 +1,12 @@
+#!/bin/sh
+# Run once after cloning.
+set -eu
+
+cd "$(dirname "$0")/.."
+echo "→ wiring git hooks from .githooks"
+git config core.hooksPath .githooks
+echo "→ syncing the Python environment"
+uv sync --frozen
+echo "→ resolving origin's default branch"
+git remote set-head origin --auto
+echo "✓ ready — see CONTRIBUTING.md, or run: scripts/agent doctor"

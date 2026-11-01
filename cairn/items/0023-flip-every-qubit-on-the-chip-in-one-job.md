@@ -1,0 +1,33 @@
+---
+id: 23
+uid: af678808-0b5a-491f-b7c6-09b97f985bd5
+title: Flip every qubit on the chip in one job
+type: feature
+status: backlog
+milestone: v0.2
+depends_on:
+- 21
+- 22
+created: 2026-11-01
+updated: 2026-11-01
+priority: p0
+effort: s
+area: hardware
+qpu: 'true'
+---
+
+## Problem
+
+The chip has over a hundred qubits, which makes it over a hundred different coins. One job
+measures all of them and turns "the real coin is biased" into a map.
+
+## Proposal
+
+`coin run chip-map --backend NAME`: predict every qubit's bias from that day's calibration,
+write `prediction.json`, then submit H + measure on all qubits at once and archive.
+
+## Acceptance criteria
+
+- [ ] `--dry-run` prints the circuit, the predictions and the estimated QPU cost without submitting
+- [ ] At least one real run is archived under `data/runs/`
+- [ ] The run's predictions predate its submission, as shown by the timestamps in `meta.json`

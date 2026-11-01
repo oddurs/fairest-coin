@@ -1,0 +1,14 @@
+#!/bin/sh
+# Fail if any file names a model or assistant as an author. The work is published
+# under its owner's name; commit messages and PR bodies are checked before they leave.
+set -eu
+
+[ $# -ge 1 ] || { echo "usage: scripts/attribution FILE..." >&2; exit 2; }
+
+pattern='co-authored-by:.*(claude|anthropic|openai|chatgpt|gpt-|copilot|gemini|noreply@anthropic)|generated (with|by) .*(claude|chatgpt|copilot|gemini|an ai|ai assistant)|claude code|anthropic|🤖|as an ai\b|ai assistant'
+
+if matches=$(grep -inE "$pattern" "$@"); then
+  echo "✗ attribution to a model or assistant is not allowed:" >&2
+  echo "$matches" >&2
+  exit 1
+fi

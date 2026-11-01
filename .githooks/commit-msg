@@ -1,0 +1,32 @@
+#!/bin/sh
+# Conventional Commits, subject ≤ 72 characters, no trailing period, no attribution.
+set -eu
+
+msg_file=$1
+subject=$(grep -v '^#' "$msg_file" | head -n 1)
+
+# Let git's own merge and revert messages through; they are not authored subjects.
+case "$subject" in
+  "Merge "* | "Revert "*) exit 0 ;;
+esac
+
+if ! echo "$subject" | grep -Eq '^(feat|fix|chore|docs|perf|refactor|test|build|ci|style|revert)(\([a-z0-9._/-]+\))?!?: [^ ].*$'; then
+  echo "✗ commit subject is not a Conventional Commit: '$subject'" >&2
+  echo "  expected: <type>(<scope>)?: <imperative subject>" >&2
+  echo "  types: feat fix chore docs perf refactor test build ci style revert" >&2
+  exit 1
+fi
+length=$(printf '%s' "$subject" | wc -m | tr -d ' ')
+if [ "$length" -gt 72 ]; then
+  echo "✗ commit subject is $length characters; the limit is 72" >&2
+  exit 1
+fi
+case "$subject" in
+  *.)
+    echo "✗ commit subject ends with a period" >&2
+    exit 1
+    ;;
+esac
+
+root=$(git rev-parse --show-toplevel)
+"$root/scripts/attribution" "$msg_file"

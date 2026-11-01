@@ -1,0 +1,4 @@
+* text=auto eol=lf
+*.png binary
+uv.lock linguist-generated=true
+ROADMAP.md linguist-generated=true

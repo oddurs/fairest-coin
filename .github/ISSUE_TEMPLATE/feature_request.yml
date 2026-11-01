@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest an experiment, a chapter, or a capability.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What question can the project not answer today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: Hardware cost
+      description: Rough QPU time, if it needs real hardware. The free allowance is small.

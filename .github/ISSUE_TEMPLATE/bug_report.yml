@@ -1,0 +1,32 @@
+name: Bug report
+description: Something computes the wrong answer, crashes, or disagrees with the physics.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen
+      description: If it is a physics disagreement, say what the theory predicts and why.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Commands or a minimal snippet. Include the job ID for hardware runs.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `coin --version`, or the commit SHA.
+    validations:
+      required: true
