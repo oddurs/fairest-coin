@@ -1,17 +1,26 @@
 """The `coin` command."""
 
 import argparse
+import gzip
+import json
+import math
 import sys
 from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
 import numpy as np
 
 from coin import __version__
+from coin.archive import ArchiveError, load_run
 from coin.circuit import Circuit
+from coin.noise import model_from_calibration, predict_tails
 from coin.sim import sample
 
 # The quantum coin: start at heads, |0⟩, apply H, measure.
 COIN = Circuit(1).h(0).measure(0, 0)
+# The same coin in IBM's native gates, as the hardware runs it: H = rz(π/2)·sx·rz(π/2).
+NATIVE_COIN = Circuit(1).rz(math.pi / 2, 0).sx(0).rz(math.pi / 2, 0).measure(0, 0)
 FACES = {"0": "heads", "1": "tails"}
 
 
@@ -42,6 +51,27 @@ def _parser() -> argparse.ArgumentParser:
         help="seed the simulator's generator to replay a run",
     )
     flip.set_defaults(handler=_flip)
+
+    predict = commands.add_parser(
+        "predict",
+        help="predict every qubit's coin from calibration data",
+        description="Predict P(tails) for the coin on every qubit of a calibration snapshot, "
+        "from readout error and decay during gates. Qubits with incomplete or unphysical "
+        "calibration are listed, not guessed.",
+    )
+    predict.add_argument(
+        "--calibration",
+        required=True,
+        type=Path,
+        metavar="PATH",
+        help="an archived run directory, or a calibration .json or .json.gz file",
+    )
+    predict.add_argument(
+        "--measurement-decay",
+        action="store_true",
+        help="also apply decay over the readout window (the double-counting alternative)",
+    )
+    predict.set_defaults(handler=_predict)
     return parser
 
 
@@ -76,3 +106,28 @@ def _flip(args: argparse.Namespace) -> int:
         n = counts.get(outcome, 0)
         print(f"{face}  {n:>{width},}  {n / args.shots:7.2%}")
     return 0
+
+
+def _predict(args: argparse.Namespace) -> int:
+    try:
+        model = model_from_calibration(_read_calibration(args.calibration))
+    except (OSError, ValueError, ArchiveError) as error:
+        print(f"coin predict: cannot read calibration: {error}", file=sys.stderr)
+        return 1
+    tails = {
+        q: predict_tails(noise, NATIVE_COIN, measurement_decay=args.measurement_decay)
+        for q, noise in model.qubits.items()
+    }
+    print("qubit  P(tails)    bias")
+    for q, p in sorted(tails.items(), key=lambda item: (item[1], item[0])):
+        print(f"{q:>5}  {p:8.5f}  {p - 0.5:+7.2%}")
+    for q, reason in sorted(model.excluded.items()):
+        print(f"{q:>5}  excluded: {reason}")
+    return 0
+
+
+def _read_calibration(path: Path) -> dict[str, Any]:
+    if path.is_dir():
+        return load_run(path).calibration
+    raw = gzip.decompress(path.read_bytes()) if path.suffix == ".gz" else path.read_bytes()
+    return json.loads(raw)

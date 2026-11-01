@@ -10,11 +10,14 @@ Two kinds of error, kept apart on purpose:
 """
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
-from coin.sim import Channel
+from coin.circuit import Circuit, Gate, Measure
+from coin.sim import Channel, probabilities
 
 
 def _check_probability(name: str, value: float) -> None:
@@ -103,3 +106,166 @@ def apply_readout(probabilities: dict[str, float], errors: dict[int, Readout]) -
             flipped[other] = flipped.get(other, 0.0) + p * p_flip
         result = flipped
     return {outcome: p for outcome, p in result.items() if p > 0}
+
+
+# ─── From a backend's calibration to a per-qubit noise model ─────────────────────────────
+
+# Spike 0018: readout asymmetry dominates a one-gate coin, decay during gates is ~40× smaller,
+# and decay during the measurement window is already inside IBM's readout calibration.
+REQUIRED_QUBIT_FIELDS = ("T1", "T2", "prob_meas1_prep0", "prob_meas0_prep1")
+# The timed native gates a lowered single-qubit circuit uses; sx is required, x optional.
+TIMED_GATES = ("sx", "x")
+# IBM reports a failed calibration as gate_error = 1, and a readout error of one half or more
+# is no better than guessing. Neither is a measurement the model can use.
+BROKEN = 0.5
+# rz is a frame change on IBM hardware: it takes no time and adds no error.
+VIRTUAL_GATES = frozenset({"rz"})
+_NANOSECONDS = {"ns": 1.0, "us": 1e3, "µs": 1e3, "ms": 1e6, "s": 1e9}
+
+
+@dataclass(frozen=True)
+class GateCalibration:
+    length_ns: float
+    error: float
+
+
+@dataclass(frozen=True)
+class QubitNoise:
+    """Everything the model knows about one physical qubit, in nanoseconds."""
+
+    t1_ns: float
+    t2_ns: float
+    readout: Readout
+    readout_length_ns: float | None
+    gates: Mapping[str, GateCalibration]
+
+
+@dataclass(frozen=True)
+class CalibrationModel:
+    """Noise for every usable qubit, and why every other qubit was left out."""
+
+    qubits: Mapping[int, QubitNoise]
+    excluded: Mapping[int, str]
+
+
+def model_from_calibration(calibration: Any) -> CalibrationModel:
+    """Build a per-qubit noise model from an IBM `backend.properties().to_dict()` snapshot.
+
+    Every problem with one qubit (a missing or nonsensical field, an unknown unit, a gate IBM
+    marks as failed, T2 > 2·T1) excludes that qubit with its reason, never a default: a
+    guessed number would be a prediction the hardware could not test. Content that is not a
+    snapshot at all raises ValueError.
+    """
+    if not (
+        isinstance(calibration, Mapping)
+        and isinstance(calibration.get("qubits"), list)
+        and isinstance(calibration.get("gates"), list)
+    ):
+        raise ValueError("not a calibration snapshot: expected an object with qubits and gates")
+
+    timed: dict[int, dict[str, list[Mapping[str, Any]]]] = {}
+    for gate in calibration["gates"]:
+        if gate.get("gate") in TIMED_GATES and len(gate.get("qubits", [])) == 1:
+            timed.setdefault(gate["qubits"][0], {}).setdefault(gate["gate"], []).append(gate)
+
+    qubits: dict[int, QubitNoise] = {}
+    excluded: dict[int, str] = {}
+    for q, props in enumerate(calibration["qubits"]):
+        try:
+            qubits[q] = _qubit_noise(props, timed.get(q, {}))
+        except _UnusableError as reason:
+            excluded[q] = str(reason)
+    return CalibrationModel(qubits, excluded)
+
+
+class _UnusableError(Exception):
+    """Why one qubit's calibration cannot be used."""
+
+
+def _qubit_noise(
+    props: list[Mapping[str, Any]], gates: Mapping[str, list[Mapping[str, Any]]]
+) -> QubitNoise:
+    fields = {p["name"]: p for p in props}
+    if missing := [name for name in REQUIRED_QUBIT_FIELDS if name not in fields]:
+        raise _UnusableError(f"missing {', '.join(missing)}")
+    t1, t2 = _in_ns(fields["T1"]), _in_ns(fields["T2"])
+    for name, value in (("T1", t1), ("T2", t2)):
+        if not (math.isfinite(value) or value == math.inf) or value <= 0:
+            raise _UnusableError(f"{name} = {value} is not a positive time")
+    if t2 > 2 * t1:
+        raise _UnusableError(f"T2 = {t2 / 1e3:.2f} µs exceeds 2·T1 = {2 * t1 / 1e3:.2f} µs")
+    readout = tuple(_number(fields[name]) for name in ("prob_meas1_prep0", "prob_meas0_prep1"))
+    if not all(0 <= p < BROKEN for p in readout):
+        raise _UnusableError(f"readout error {readout} is no better than guessing")
+
+    calibrated: dict[str, GateCalibration] = {}
+    for name, entries in gates.items():
+        if len(entries) > 1:
+            raise _UnusableError(f"duplicate {name} calibration")
+        params = {p["name"]: p for p in entries[0]["parameters"]}
+        if "gate_length" not in params or "gate_error" not in params:
+            raise _UnusableError(f"{name} calibration lacks gate_length or gate_error")
+        error = _number(params["gate_error"])
+        if not 0 <= error < BROKEN:
+            raise _UnusableError(f"{name} gate_error = {error} marks a failed calibration")
+        calibrated[name] = GateCalibration(_in_ns(params["gate_length"]), error)
+    if "sx" not in calibrated:
+        raise _UnusableError("no sx calibration")
+
+    length = fields.get("readout_length")
+    return QubitNoise(
+        t1_ns=t1,
+        t2_ns=t2,
+        readout=Readout(readout[0], readout[1]),
+        readout_length_ns=None if length is None else _in_ns(length),
+        gates=calibrated,
+    )
+
+
+def predict_tails(noise: QubitNoise, circuit: Circuit, *, measurement_decay: bool = False) -> float:
+    """P(tails) for a one-qubit circuit, measured into classical bit 0, on this qubit.
+
+    The circuit must already be in the hardware's native gates; anything without a
+    calibrated duration raises rather than being treated as free. `measurement_decay`
+    adds T1/T2 over the readout window: the double-counting alternative spike 0018 rejected,
+    kept so hardware can settle the question.
+    """
+    if circuit.n_qubits != 1:
+        raise ValueError(f"predict_tails takes a one-qubit circuit, got {circuit.n_qubits}")
+
+    def channels(op: Gate | Measure) -> tuple[Channel, ...]:
+        if isinstance(op, Measure):
+            if not measurement_decay:
+                return ()
+            if noise.readout_length_ns is None:
+                raise ValueError("measurement decay needs readout_length, which is missing")
+            return thermal_relaxation(noise.t1_ns, noise.t2_ns, noise.readout_length_ns, 0)
+        if op.name in VIRTUAL_GATES:
+            return ()
+        if op.name not in noise.gates:
+            raise ValueError(
+                f"no calibration for gate {op.name}; lower the circuit to native gates first"
+            )
+        cal = noise.gates[op.name]
+        # IBM reports average gate error r; for one qubit, depolarizing p = 2r.
+        return (
+            *thermal_relaxation(noise.t1_ns, noise.t2_ns, cal.length_ns, 0),
+            depolarizing(min(1.0, 2 * cal.error), 0),
+        )
+
+    true = probabilities(circuit, channels)
+    return apply_readout(true, {0: noise.readout}).get("1", 0.0)
+
+
+def _number(field: Mapping[str, Any]) -> float:
+    value = field.get("value")
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise _UnusableError(f"{field.get('name')} = {value!r} is not a number")
+    return float(value)
+
+
+def _in_ns(field: Mapping[str, Any]) -> float:
+    unit = field.get("unit", "")
+    if unit not in _NANOSECONDS:
+        raise _UnusableError(f"{field.get('name')} has unknown time unit {unit!r}")
+    return _number(field) * _NANOSECONDS[unit]
