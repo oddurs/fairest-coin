@@ -38,13 +38,14 @@ def probabilities(circuit: Circuit) -> dict[str, float]:
 
     Outcomes below `NEGLIGIBLE` are omitted, so the keys are the outcomes that can happen.
     """
-    outcomes = _outcome_strings(circuit)
+    readout = _readout(circuit)
     born = _born(simulate(circuit))
-    result: dict[str, float] = {}
-    for index in np.flatnonzero(born > NEGLIGIBLE):
-        key = outcomes[index]
-        result[key] = result.get(key, 0.0) + float(born[index])
-    return result
+    totals: dict[str, float] = {}
+    for index in np.flatnonzero(born):
+        key = _outcome(int(index), readout, circuit.n_qubits)
+        totals[key] = totals.get(key, 0.0) + float(born[index])
+    # Filter after summing: an outcome can be many basis states, each too small alone.
+    return {key: p for key, p in totals.items() if p > NEGLIGIBLE}
 
 
 def sample(circuit: Circuit, shots: int, rng: np.random.Generator) -> dict[str, int]:
@@ -54,11 +55,11 @@ def sample(circuit: Circuit, shots: int, rng: np.random.Generator) -> dict[str, 
     """
     if shots < 1:
         raise ValueError(f"shots must be at least 1, got {shots}")
-    outcomes = _outcome_strings(circuit)
+    readout = _readout(circuit)
     counts = rng.multinomial(shots, _born(simulate(circuit)))
     result: dict[str, int] = {}
     for index in np.flatnonzero(counts):
-        key = outcomes[index]
+        key = _outcome(int(index), readout, circuit.n_qubits)
         result[key] = result.get(key, 0) + int(counts[index])
     return result
 
@@ -93,16 +94,20 @@ def _born(state: StateVector) -> npt.NDArray[np.float64]:
     return born / born.sum()
 
 
-def _outcome_strings(circuit: Circuit) -> list[str]:
-    """For each basis index, the classical bit string a measurement of it would record."""
-    n = circuit.n_qubits
+def _readout(circuit: Circuit) -> dict[int, int]:
+    """Classical bit → the qubit last measured into it."""
     readout = {op.clbit: op.qubit for op in circuit.ops if isinstance(op, Measure)}
     if not readout:
         raise ValueError("the circuit measures nothing, so it has no outcomes")
-    strings = []
-    for index in range(2**n):
-        bits = ["0"] * n  # unmeasured classical bits read 0, as on hardware
-        for clbit, qubit in readout.items():
-            bits[n - 1 - clbit] = str((index >> qubit) & 1)
-        strings.append("".join(bits))
-    return strings
+    return readout
+
+
+def _outcome(index: int, readout: dict[int, int], n: int) -> str:
+    """The classical bit string recorded when the qubits are found in basis state `index`.
+
+    Built only for basis states that occur, never for all 2ⁿ of them.
+    """
+    bits = ["0"] * n  # unmeasured classical bits read 0, as on hardware
+    for clbit, qubit in readout.items():
+        bits[n - 1 - clbit] = str((index >> qubit) & 1)
+    return "".join(bits)
