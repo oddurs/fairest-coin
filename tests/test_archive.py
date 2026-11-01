@@ -236,3 +236,21 @@ def test_an_existing_run_is_never_overwritten(tmp_path: Path) -> None:
 
 def test_the_layout_names_match_the_first_run() -> None:
     assert {*archive.REQUIRED, *archive.OPTIONAL} == {p.name for p in FIRST_RUN.iterdir()}
+
+
+def test_a_failure_halfway_leaves_nothing_and_the_retry_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = make_run()
+
+    def disk_full(_data: bytes, mtime: float | None = None) -> bytes:
+        raise OSError("No space left on device")
+
+    # The calibration is written after meta, circuit and counts: a genuine partial write.
+    monkeypatch.setattr(archive.gzip, "compress", disk_full)
+    with pytest.raises(OSError, match="No space"):
+        write_run(tmp_path, run)
+    assert list(tmp_path.iterdir()) == []
+
+    monkeypatch.undo()
+    assert load_run(write_run(tmp_path, run)) == run

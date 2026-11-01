@@ -8,6 +8,8 @@ immutable, so the loader reads every run ever written, including the first one, 
 
 import gzip
 import json
+import shutil
+import tempfile
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -187,22 +189,31 @@ def write_run(runs_dir: Path | str, run: Run, *, allow_no_prediction: bool = Fal
     if run.no_prediction_reason is not None:
         meta["no_prediction_reason"] = run.no_prediction_reason
 
-    target.mkdir(parents=True)
-    _write_json(target / META, meta)
-    (target / CIRCUIT).write_text(run.circuit_qasm)
-    _write_json(target / COUNTS, run.counts)
-    # mtime=0 keeps the bytes a function of the calibration alone, so git sees no churn.
-    (target / CALIBRATION).write_bytes(gzip.compress(_dump_json(run.calibration), mtime=0))
-    if run.prediction is not None:
-        _write_json(target / PREDICTION, _prediction_json(run.prediction))
-    if run.prediction_dryrun is not None:
-        _write_json(target / PREDICTION_DRYRUN, _prediction_json(run.prediction_dryrun))
-    if run.memory is not None:
-        (target / MEMORY).write_text("".join(run.memory) + "\n")
-    if run.usage is not None:
-        _write_json(target / USAGE, run.usage)
-    if run.submit_script is not None:
-        (target / SUBMIT).write_text(run.submit_script)
+    # Write into a hidden staging directory and rename it into place: a run appears whole or
+    # not at all, so a failure halfway can never leave a partial run blocking its own retry.
+    Path(runs_dir).mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{run.directory_name}.", dir=runs_dir))
+    try:
+        _write_json(staging / META, meta)
+        (staging / CIRCUIT).write_text(run.circuit_qasm)
+        _write_json(staging / COUNTS, run.counts)
+        # mtime=0 keeps the bytes a function of the calibration alone, so git sees no churn.
+        (staging / CALIBRATION).write_bytes(gzip.compress(_dump_json(run.calibration), mtime=0))
+        if run.prediction is not None:
+            _write_json(staging / PREDICTION, _prediction_json(run.prediction))
+        if run.prediction_dryrun is not None:
+            _write_json(staging / PREDICTION_DRYRUN, _prediction_json(run.prediction_dryrun))
+        if run.memory is not None:
+            (staging / MEMORY).write_text("".join(run.memory) + "\n")
+        if run.usage is not None:
+            _write_json(staging / USAGE, run.usage)
+        if run.submit_script is not None:
+            (staging / SUBMIT).write_text(run.submit_script)
+        staging.rename(target)
+    except BaseException:
+        # Best effort: the original error is the one worth reporting.
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
     return target
 
 
