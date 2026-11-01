@@ -3,10 +3,12 @@ id: 65
 uid: 86f8684b-aee6-446b-9a58-28c693b8e127
 title: Dispatch CLI subcommands explicitly
 type: chore
-status: backlog
+status: done
 milestone: v0.2
+assignee: Oddur Sigurdsson
 created: 2026-11-01
 updated: 2026-11-01
+closed_at: 2026-11-01
 priority: p1
 effort: s
 area: cli
@@ -27,3 +29,7 @@ Each subparser registers its handler with `set_defaults(func=...)` and `main()` 
 1. Read `src/coin/cli.py` `main`.
 
 Found by the v0.1 milestone review; design debt in 0010.
+
+## Result
+
+coin.cli: each subparser registers set_defaults(handler=...) and main() returns args.handler(args). A test adds a probe subcommand and proves it reaches its own handler; it failed with AttributeError before the change.

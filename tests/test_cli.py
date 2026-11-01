@@ -1,6 +1,8 @@
+import argparse
+
 import pytest
 
-from coin import __version__
+from coin import __version__, cli
 from coin.cli import main
 
 
@@ -86,3 +88,20 @@ def test_help_describes_every_flag(argv: list[str], capsys: pytest.CaptureFixtur
     expected = ["flip", "--version"] if argv == ["--help"] else ["--sim", "--shots", "--seed"]
     for flag in expected:
         assert flag in out
+
+
+def test_each_subcommand_reaches_its_own_handler(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A second subcommand must not fall through to the flip logic.
+    build = cli._parser
+
+    def with_probe() -> argparse.ArgumentParser:
+        parser = build()
+        commands = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+        commands.add_parser("probe").set_defaults(handler=lambda _args: 7)
+        return parser
+
+    monkeypatch.setattr(cli, "_parser", with_probe)
+    assert run(["probe"], capsys)[0] == 7
+    assert run(["flip", "--sim", "--seed", "1"], capsys)[0] == 0

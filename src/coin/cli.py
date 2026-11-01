@@ -17,7 +17,7 @@ FACES = {"0": "heads", "1": "tails"}
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    return _flip(args)
+    return args.handler(args)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -41,6 +41,7 @@ def _parser() -> argparse.ArgumentParser:
         metavar="S",
         help="seed the simulator's generator to replay a run",
     )
+    flip.set_defaults(handler=_flip)
     return parser
 
 

@@ -43,7 +43,10 @@
 - [ ] [`0062`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0062-apply-the-negligible-cutoff-per-outcome-and-only-build-occurring-outcomes.md) Apply the negligible cutoff per outcome, and only build occurring outcomes <sup>bug · p1 · sim</sup>
 - [ ] [`0063`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0063-hold-the-simulator-tests-to-the-project-s-float-rules.md) Hold the simulator tests to the project's float rules <sup>bug · p1 · sim</sup>
 - [ ] [`0064`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0064-check-every-command-a-chapter-or-the-readme-quotes.md) Check every command a chapter or the README quotes <sup>bug · p1 · essay</sup>
-- [ ] [`0065`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0065-dispatch-cli-subcommands-explicitly.md) Dispatch CLI subcommands explicitly <sup>chore · p1 · cli</sup>
+
+### done
+
+- [x] [`0065`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0065-dispatch-cli-subcommands-explicitly.md) Dispatch CLI subcommands explicitly <sup>chore · p1 · cli</sup>
 
 ### done
 
