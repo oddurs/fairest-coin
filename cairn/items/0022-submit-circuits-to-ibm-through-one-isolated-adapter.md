@@ -35,3 +35,7 @@ through the archive.
 - [ ] Submission is tested against a fake transport with no network
 - [ ] A finished job's QPU seconds are recorded in `meta.json`
 - [ ] The token never appears in logs, archives or error messages, checked by a test
+
+## 2026-11-01
+
+From spike 0015: channel='ibm_quantum_platform' needs QISKIT_IBM_INSTANCE (the CRN) as well as QISKIT_IBM_TOKEN. SamplerV2 is deprecated since qiskit-ibm-runtime 0.50.0; use executor_sampler.Sampler. qasm3.loads needs the qiskit-qasm3-import package.

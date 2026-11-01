@@ -33,3 +33,7 @@ through a given layout. Then emit OpenQASM 3 for the lowered circuit.
 - [ ] H lowers to exactly rz(π/2), sx, rz(π/2)
 - [ ] The QASM 3 output parses with `qiskit.qasm3.loads` in a test (Qiskit as a test-only dependency)
 - [ ] Gates outside the native set are never emitted, checked by a test
+
+## 2026-11-01
+
+From spike 0015: native set confirmed as rz, sx, x (and cz) on all three Heron r2 backends.

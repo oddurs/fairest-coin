@@ -30,3 +30,7 @@ rather than being routed: we never route.
 - [ ] Property test: lowered two-qubit circuits equal the originals up to global phase
 - [ ] The Bell circuit lowers to exactly one native two-qubit gate
 - [ ] A gate on an uncoupled pair raises `ValueError` naming both qubits
+
+## 2026-11-01
+
+From spike 0015: the native two-qubit gate on all three backends is cz.

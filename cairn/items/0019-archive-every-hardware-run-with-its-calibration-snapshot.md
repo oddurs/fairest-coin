@@ -33,3 +33,7 @@ are committed to git.
 - [ ] Round-trip test: write a run, load it, get back an equal `Run`
 - [ ] Loading a run with a missing or malformed file raises an error naming the file
 - [ ] The format is documented in `data/README.md`
+
+## 2026-11-01
+
+From spike 0015: the first run fixed the layout (circuit.qasm, prediction.json, calibration.json.gz, counts.json, memory.txt with per-shot bits, meta.json, submit.py, usage.json). Timestamps must be sub-second: prediction and submission shared a second. Gzip the calibration (1.4 MB → 60 KB). Usage reads 'pending' at result time, so fetch the final record afterwards into its own file rather than editing meta.json.

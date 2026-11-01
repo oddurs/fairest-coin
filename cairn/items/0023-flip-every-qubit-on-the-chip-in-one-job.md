@@ -31,3 +31,7 @@ write `prediction.json`, then submit H + measure on all qubits at once and archi
 - [ ] `--dry-run` prints the circuit, the predictions and the estimated QPU cost without submitting
 - [ ] At least one real run is archived under `data/runs/`
 - [ ] The run's predictions predate its submission, as shown by the timestamps in `meta.json`
+
+## 2026-11-01
+
+From spike 0015: one 4,096-shot job resolves ±0.78% per qubit, but the median predicted bias is −0.44%, so only ~9 of 156 qubits would stand out. Plan ~10⁵ shots per qubit, check the per-job shot limit and cost before submitting, and get approval for the budget. All-qubit job cost is still unmeasured.
