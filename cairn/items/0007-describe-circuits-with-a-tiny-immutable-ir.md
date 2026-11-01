@@ -31,3 +31,7 @@ circuits (`c.h(0).measure(0, 0)`). No execution logic lives here.
 - [x] Referencing a qubit outside `range(n_qubits)` raises `ValueError` naming the qubit
 - [x] A gate given the wrong number of qubits or parameters raises `ValueError`
 - [x] Circuits compare equal by value and are hashable
+
+## Result
+
+coin/circuit.py: frozen Circuit(n_qubits, ops) of Gate(name, qubits, params) and Measure(qubit, clbit); gate set and arities in ARITY; for two-qubit gates qubits[0] is the control; classical bits = qubits; mid-circuit measurement is legal in the IR, so consumers must reject it if they can't handle it.
