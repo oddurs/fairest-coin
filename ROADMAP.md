@@ -21,7 +21,7 @@
 
 ## v0.2 — The real coin
 
-`#######···` 61% · 11 of 18 done · due 2026-11-22
+`#######···` 67% · 12 of 18 done · due 2026-11-22
 
 `coin predict` forecasts every qubit's coin bias from IBM's calibration data, and the
 
@@ -30,7 +30,6 @@
 - [ ] [`0021`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0021-predict-each-qubit-s-coin-bias-from-calibration-data.md) Predict each qubit's coin bias from calibration data <sup>feature · p0 · noise</sup>
 - [ ] [`0022`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0022-submit-circuits-to-ibm-through-one-isolated-adapter.md) Submit circuits to IBM through one isolated adapter <sup>feature · p0 · hardware</sup>
 - [ ] [`0023`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0023-flip-every-qubit-on-the-chip-in-one-job.md) Flip every qubit on the chip in one job <sup>feature · p0 · hardware</sup>
-- [ ] [`0024`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0024-regenerate-figures-deterministically-from-the-archive.md) Regenerate figures deterministically from the archive <sup>feature · p1 · figures</sup>
 - [ ] [`0025`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0025-draw-the-chip-map-and-the-prediction-scatter.md) Draw the chip map and the prediction scatter <sup>feature · p1 · figures</sup>
 - [ ] [`0026`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0026-write-chapter-2-predict-the-real-coin.md) Write chapter 2: predict the real coin <sup>docs · p0 · essay</sup>
 - [ ] [`0027`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0027-cut-v0-2-0.md) Cut v0.2.0 <sup>chore · p0 · tooling</sup>
@@ -43,6 +42,7 @@
 - [x] [`0018`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0018-which-error-sources-dominate-a-one-gate-coin.md) Which error sources dominate a one-gate coin? <sup>spike · p1 · noise</sup>
 - [x] [`0019`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0019-archive-every-hardware-run-with-its-calibration-snapshot.md) Archive every hardware run with its calibration snapshot <sup>feature · p0 · hardware</sup>
 - [x] [`0020`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0020-lower-single-qubit-gates-to-the-native-rz-sx-x-basis.md) Lower single-qubit gates to the native rz/sx/x basis <sup>feature · p0 · compile</sup>
+- [x] [`0024`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0024-regenerate-figures-deterministically-from-the-archive.md) Regenerate figures deterministically from the archive <sup>feature · p1 · figures</sup>
 - [x] [`0061`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0061-reject-non-finite-angles-and-non-integer-indices-in-the-ir.md) Reject non-finite angles and non-integer indices in the IR <sup>bug · p1 · sim</sup>
 - [x] [`0062`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0062-apply-the-negligible-cutoff-per-outcome-and-only-build-occurring-outcomes.md) Apply the negligible cutoff per outcome, and only build occurring outcomes <sup>bug · p1 · sim</sup>
 - [x] [`0063`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0063-hold-the-simulator-tests-to-the-project-s-float-rules.md) Hold the simulator tests to the project's float rules <sup>bug · p1 · sim</sup>

@@ -47,6 +47,13 @@ scripts/task fmt     # fix formatting and autofixable lint
 `pre-commit` runs format and lint checks; `pre-push` runs the full `check`. CI runs the
 same `scripts/task check`. Never bypass a hook with `--no-verify`.
 
+## Figures
+
+Every figure in `docs/figures/` is rendered from `data/runs/` by `scripts/figures`, and
+`build` fails if a committed figure differs from a fresh render. To add one, write a
+function from the runs directory to a matplotlib `Figure` in `src/coin/figures.py`, add it
+to `FIGURES`, run `scripts/figures`, and commit the SVG it writes.
+
 ## Hardware runs
 
 Real QPU time is scarce. Simulate first, write the prediction down before submitting, and

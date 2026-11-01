@@ -51,6 +51,14 @@ dev = [
     "ruff>=0.17.3",
     "ty>=0.0.95",
 ]
+figures = [
+    "matplotlib>=3.11.2",
+]
+
+[tool.uv]
+# Every sync carries the figures group, so CI, hooks and a fresh clone can all check the
+# committed figures. It is still a group: the published wheel never depends on matplotlib.
+default-groups = ["dev", "figures"]
 
 [tool.ty.src]
 exclude = ["data"]
