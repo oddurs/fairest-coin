@@ -8,8 +8,9 @@ from coin.circuit import ARITY, Circuit, Gate
 from coin.gates import matrix
 from coin.sim import probabilities, sample, simulate
 
-# Exact algebra: anything above rounding error is a real mistake.
-EXACT = 1e-10
+# Exact algebra, as in test_gates.py: unit-modulus arithmetic over at most 20 gates
+# accumulates rounding near 1e-15, so anything above 1e-12 is a real mistake.
+EXACT = 1e-12
 
 COIN = Circuit(1).h(0).measure(0, 0)
 BELL = Circuit(2).h(0).cx(0, 1).measure_all()
@@ -66,23 +67,29 @@ def test_bell_pair_always_agrees() -> None:
 
 
 def test_qubit_zero_is_the_rightmost_bit() -> None:
-    assert probabilities(Circuit(3).x(0).measure_all()) == {"001": 1.0}
-    assert probabilities(Circuit(3).x(2).measure_all()) == {"100": 1.0}
+    assert probabilities(Circuit(3).x(0).measure_all()) == pytest.approx({"001": 1.0}, abs=EXACT)
+    assert probabilities(Circuit(3).x(2).measure_all()) == pytest.approx({"100": 1.0}, abs=EXACT)
 
 
 def test_classical_bit_mapping_is_honoured() -> None:
     # qubit 0 into classical bit 1: the 1 appears in the second position from the right
-    assert probabilities(Circuit(2).x(0).measure(0, 1)) == {"10": 1.0}
+    assert probabilities(Circuit(2).x(0).measure(0, 1)) == pytest.approx({"10": 1.0}, abs=EXACT)
 
 
 def test_two_qubits_into_one_classical_bit_keeps_the_last() -> None:
     # As on hardware, a later measurement overwrites the classical bit.
-    assert probabilities(Circuit(3).x(0).measure(0, 0).measure(1, 0)) == {"000": 1.0}
-    assert probabilities(Circuit(3).x(1).measure(0, 0).measure(1, 0)) == {"001": 1.0}
+    assert probabilities(Circuit(3).x(0).measure(0, 0).measure(1, 0)) == pytest.approx(
+        {"000": 1.0}, abs=EXACT
+    )
+    assert probabilities(Circuit(3).x(1).measure(0, 0).measure(1, 0)) == pytest.approx(
+        {"001": 1.0}, abs=EXACT
+    )
 
 
 def test_one_qubit_into_two_classical_bits_fills_both() -> None:
-    assert probabilities(Circuit(3).x(0).measure(0, 0).measure(0, 2)) == {"101": 1.0}
+    assert probabilities(Circuit(3).x(0).measure(0, 0).measure(0, 2)) == pytest.approx(
+        {"101": 1.0}, abs=EXACT
+    )
 
 
 def test_rounding_error_is_not_an_outcome() -> None:
@@ -90,12 +97,14 @@ def test_rounding_error_is_not_an_outcome() -> None:
 
 
 def test_unmeasured_classical_bits_read_zero() -> None:
-    assert probabilities(Circuit(2).x(0).x(1).measure(0, 0)) == {"01": 1.0}
+    assert probabilities(Circuit(2).x(0).x(1).measure(0, 0)) == pytest.approx(
+        {"01": 1.0}, abs=EXACT
+    )
 
 
 def test_initial_state_is_all_zeros() -> None:
     state = simulate(Circuit(3))
-    assert state[0] == 1
+    assert state[0] == pytest.approx(1, abs=EXACT)
     assert np.count_nonzero(state) == 1
 
 
@@ -139,7 +148,9 @@ def test_gate_after_measurement_is_rejected() -> None:
 
 
 def test_gates_on_other_qubits_after_a_measurement_are_fine() -> None:
-    assert probabilities(Circuit(2).measure(0, 0).x(1).measure(1, 1)) == {"10": 1.0}
+    assert probabilities(Circuit(2).measure(0, 0).x(1).measure(1, 1)) == pytest.approx(
+        {"10": 1.0}, abs=EXACT
+    )
 
 
 def test_circuit_without_measurement_has_no_outcomes() -> None:
