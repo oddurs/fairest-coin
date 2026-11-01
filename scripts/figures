@@ -1,0 +1,8 @@
+#!/bin/sh
+# Render every figure in docs/figures/ from data/runs/; --check fails if any committed one differs.
+set -eu
+
+cd "$(dirname "$0")/.."
+
+echo "→ uv run --frozen --group figures python -m coin.figures $*"
+exec uv run --frozen --group figures python -m coin.figures "$@"

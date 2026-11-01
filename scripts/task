@@ -15,8 +15,8 @@ task() {
     fmt:check) run uv run --frozen ruff format --check . ;;
     lint) run uv run --frozen ruff check . && run uv run --frozen ty check --error-on-warning ;;
     test) run uv run --frozen pytest ;;
-    # A pure library: building the wheel is the build, and proves packaging works.
-    build) run uv build --quiet --out-dir "${TMPDIR:-/tmp}/fairest-coin-dist" ;;
+    # Building the wheel proves packaging works; the figures must be the archive's own render.
+    build) run uv build --quiet --out-dir "${TMPDIR:-/tmp}/fairest-coin-dist" && run scripts/figures --check ;;
     check) task fmt:check && task lint && task test && task build ;;
     *)
       echo "✗ unknown task: $1" >&2
