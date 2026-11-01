@@ -25,7 +25,7 @@ yet. The plan, milestone by milestone, is in [ROADMAP.md](ROADMAP.md).
 | Chapter | Question | Status |
 |---|---|---|
 | [0. Your coin is unfair](docs/chapters/00-your-coin-is-unfair.md) | Why does this question matter? | written |
-| 1. The ideal coin | What is a quantum coin? | upcoming in v0.1 |
+| [1. The ideal coin](docs/chapters/01-the-ideal-coin.md) | What is a quantum coin? | written |
 | 2. Predict the real coin | How does real hardware bend it? | upcoming in v0.2 |
 | 3. Make it fair | Can a biased coin be fixed? | upcoming in v0.3 |
 | 4. Two coins that agree | What is entanglement for? | upcoming in v0.4 |
