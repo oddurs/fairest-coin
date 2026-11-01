@@ -21,13 +21,12 @@
 
 ## v0.2 — The real coin
 
-`####······` 39% · 7 of 18 done · due 2026-11-22
+`#####·····` 44% · 8 of 18 done · due 2026-11-22
 
 `coin predict` forecasts every qubit's coin bias from IBM's calibration data, and the
 
 ### backlog
 
-- [ ] [`0016`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0016-extend-the-simulator-to-density-matrices.md) Extend the simulator to density matrices <sup>feature · p0 · sim</sup>
 - [ ] [`0017`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0017-implement-the-noise-channels-as-kraus-operators.md) Implement the noise channels as Kraus operators <sup>feature · p0 · noise</sup>
 - [ ] [`0018`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0018-which-error-sources-dominate-a-one-gate-coin.md) Which error sources dominate a one-gate coin? <sup>spike · p1 · noise</sup>
 - [ ] [`0020`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0020-lower-single-qubit-gates-to-the-native-rz-sx-x-basis.md) Lower single-qubit gates to the native rz/sx/x basis <sup>feature · p0 · compile</sup>
@@ -42,6 +41,7 @@
 ### done
 
 - [x] [`0015`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0015-how-do-we-reach-ibm-hardware-and-what-does-a-job-cost.md) How do we reach IBM hardware, and what does a job cost? <sup>spike · p0 · hardware</sup>
+- [x] [`0016`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0016-extend-the-simulator-to-density-matrices.md) Extend the simulator to density matrices <sup>feature · p0 · sim</sup>
 - [x] [`0019`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0019-archive-every-hardware-run-with-its-calibration-snapshot.md) Archive every hardware run with its calibration snapshot <sup>feature · p0 · hardware</sup>
 - [x] [`0061`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0061-reject-non-finite-angles-and-non-integer-indices-in-the-ir.md) Reject non-finite angles and non-integer indices in the IR <sup>bug · p1 · sim</sup>
 - [x] [`0062`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0062-apply-the-negligible-cutoff-per-outcome-and-only-build-occurring-outcomes.md) Apply the negligible cutoff per outcome, and only build occurring outcomes <sup>bug · p1 · sim</sup>

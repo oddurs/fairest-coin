@@ -1,12 +1,12 @@
 import numpy as np
 import pytest
 from hypothesis import given, settings
-from hypothesis import strategies as st
 
 from coin import sim
-from coin.circuit import ARITY, Circuit, Gate
+from coin.circuit import Circuit, Gate
 from coin.gates import matrix
 from coin.sim import probabilities, sample, simulate
+from tests.strategies import circuits
 
 # Exact algebra, as in test_gates.py: unit-modulus arithmetic over at most 20 gates
 # accumulates rounding near 1e-15, so anything above 1e-12 is a real mistake.
@@ -14,24 +14,6 @@ EXACT = 1e-12
 
 COIN = Circuit(1).h(0).measure(0, 0)
 BELL = Circuit(2).h(0).cx(0, 1).measure_all()
-
-
-@st.composite
-def gates(draw: st.DrawFn, n_qubits: int) -> Gate:
-    names = [name for name, (k, _) in ARITY.items() if k <= n_qubits]
-    name = draw(st.sampled_from(sorted(names)))
-    k, n_params = ARITY[name]
-    qubits = draw(st.permutations(range(n_qubits)))[:k]
-    angle = st.floats(min_value=-2 * np.pi, max_value=2 * np.pi, allow_nan=False)
-    params = tuple(draw(angle) for _ in range(n_params))
-    return Gate(name, tuple(qubits), params)
-
-
-@st.composite
-def circuits(draw: st.DrawFn, max_qubits: int) -> Circuit:
-    n = draw(st.integers(min_value=1, max_value=max_qubits))
-    ops = draw(st.lists(gates(n), max_size=20))
-    return Circuit(n, tuple(ops))
 
 
 def reference_unitary(circuit: Circuit) -> np.ndarray:

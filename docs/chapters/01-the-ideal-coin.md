@@ -115,12 +115,14 @@ the right, as in binary numbers and as on IBM's hardware, so qubit 0 is the *las
 
 `probabilities` is exact. A real coin does not give you probabilities; it gives you one
 outcome per flip. The simulator imitates that by drawing outcomes with the Born
-probabilities:
+probabilities, all `shots` flips in one draw:
 
 <!-- from: src/coin/sim.py -->
 ```python
-    counts = rng.multinomial(shots, _born(simulate(circuit)))
+    counts = rng.multinomial(shots, _distribution(circuit, noise))
 ```
+
+(`noise` is empty for the ideal coin. Chapter 2 is where it stops being empty.)
 
 and the `coin` command wraps it:
 
