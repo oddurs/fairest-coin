@@ -25,7 +25,7 @@
 
 v0.3.1: every defect found by the review of the first three milestones is fixed, the essay
 
-### backlog
+### in progress
 
 - [ ] [`0085`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0085-cut-v0-3-1.md) Cut v0.3.1 <sup>chore · p0 · tooling</sup>
 
