@@ -38,3 +38,7 @@ neighbouring qubits, on archived runs that keep per-shot memory, with significan
 ## Answer
 
 <!-- Filled in when the spike closes. -->
+
+## 2026-11-01
+
+The chip-map run keeps per-shot memory for all 156 qubits (data/runs/2026-11-02-dbjuh5d6p51s73cljo60). A first look already shows drift: splitting the 100,000 shots in halves gives a per-qubit z spread of 2.2 where 1.0 is expected, and q29 falls from 68.8% to 65.9% tails across the job.

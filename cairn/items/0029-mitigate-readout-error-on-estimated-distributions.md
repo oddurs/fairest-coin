@@ -30,3 +30,7 @@ result a valid probability distribution.
 - [ ] Simulated round trip: apply a known confusion matrix, mitigate, recover the original within sampling error
 - [ ] Never returns negative probabilities
 - [ ] The docstring says plainly that mitigation acts on distributions, not on bits
+
+## 2026-11-01
+
+From 0023: the published readout calibration did not predict the chip-map coin (r = −0.002 per qubit; q118's calibration says 47% of |0⟩ reads as 1, yet its coin was fair). Estimate the confusion matrix from our own calibration circuits, as proposed, and never from the backend's properties. Spike 0069 runs those circuits.
