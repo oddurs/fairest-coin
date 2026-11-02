@@ -45,8 +45,8 @@ scripts/agent done                         # after the squash merge
 ```
 
 Branch types: `feat fix chore docs perf refactor test`; the slug starts with the cairn id.
-Commits are Conventional Commits, subject ≤ 72 characters, no trailing period, body says
-why, `Refs: 0009` trailer. A PR body states the problem, the approach, and what a reviewer
+Commits are Conventional Commits, subject ≤ 64 characters (the squash merge adds " (#N)" to
+reach 72), no trailing period, body says why, `Refs: 0009` trailer. A PR body states the problem, the approach, and what a reviewer
 should look at sceptically — say where it is weak.
 
 ## Python

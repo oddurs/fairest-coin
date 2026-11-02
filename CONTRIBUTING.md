@@ -31,7 +31,8 @@ start the slug with its id: `feat/0009-statevector-simulator`.
 ## Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/): `type(scope)!: subject`,
-imperative, at most 72 characters, no trailing period. The body explains why. Reference
+imperative, at most 64 characters (a squash merge appends " (#N)", and the subject on `main`
+must stay within 72), no trailing period. The body explains why. Reference
 the cairn item with a `Refs: 0009` trailer. The `commit-msg` hook enforces the format.
 
 Pull requests are squash-merged, so the PR title becomes the commit on `main` and must
