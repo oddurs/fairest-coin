@@ -6,6 +6,7 @@ import json
 import math
 import sys
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +18,7 @@ from coin.chipmap import MAX_SHOTS
 from coin.circuit import Circuit
 from coin.hardware import Transport, submit
 from coin.noise import model_from_calibration, predict_tails
-from coin.pool import POOL_ENV, EmptyPoolError, Pool
+from coin.pool import POOL_ENV, EmptyPoolError, Pool, receipt
 from coin.sim import sample
 
 # The quantum coin: start at heads, |0⟩, apply H, measure.
@@ -38,29 +39,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"coin {__version__}")
     commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
-    flip = commands.add_parser(
-        "flip",
-        help="flip the quantum coin",
-        description="Flip a quantum coin. With --sim, H on |0⟩ then measure, simulated. "
-        "Without it, spend bits harvested from real hardware (`coin harvest`). "
-        "Heads is 0, tails is 1.",
-    )
-    flip.add_argument(
-        "--sim",
-        action="store_true",
-        help="flip on the built-in simulator; without it, spend bits from the entropy pool",
-    )
-    flip.add_argument(
-        "--shots", type=_at_least(1), metavar="N", help="flip N times and print the counts"
-    )
-    flip.add_argument(
-        "--seed",
-        type=_at_least(0),
-        metavar="S",
-        help="seed the simulator's generator to replay a run",
-    )
-    flip.add_argument("--pool", type=Path, metavar="DIR", help=f"the entropy pool (${POOL_ENV})")
-    flip.set_defaults(handler=_flip)
+    _add_flip(commands)
 
     pool = commands.add_parser(
         "pool",
@@ -187,6 +166,39 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _add_flip(commands: Any) -> None:
+    flip = commands.add_parser(
+        "flip",
+        help="flip the quantum coin",
+        description="Flip a quantum coin. With --sim, H on |0⟩ then measure, simulated. "
+        "Without it, spend bits harvested from real hardware (`coin harvest`). "
+        "Heads is 0, tails is 1.",
+    )
+    flip.add_argument(
+        "--sim",
+        action="store_true",
+        help="flip on the built-in simulator; without it, spend bits from the entropy pool",
+    )
+    flip.add_argument(
+        "--shots", type=_at_least(1), metavar="N", help="flip N times and print the counts"
+    )
+    flip.add_argument(
+        "--seed",
+        type=_at_least(0),
+        metavar="S",
+        help="seed the simulator's generator to replay a run",
+    )
+    flip.add_argument("--pool", type=Path, metavar="DIR", help=f"the entropy pool (${POOL_ENV})")
+    output = flip.add_mutually_exclusive_group()
+    output.add_argument(
+        "--json",
+        action="store_true",
+        help="print the flip's receipt as JSON (docs/receipt.schema.json)",
+    )
+    output.add_argument("--quiet", action="store_true", help="print only HEADS or TAILS")
+    flip.set_defaults(handler=_flip)
+
+
 def _at_least(minimum: int) -> Callable[[str], int]:
     def parse(text: str) -> int:
         try:
@@ -203,6 +215,9 @@ def _at_least(minimum: int) -> Callable[[str], int]:
 def _flip(args: argparse.Namespace) -> int:
     if not args.sim:
         return _flip_from_pool(args)
+    if args.json:
+        print("coin flip: --json is a hardware flip's receipt; --sim has none", file=sys.stderr)
+        return 2
     if args.pool is not None:
         print("coin flip: --pool is for pool bits; it cannot go with --sim", file=sys.stderr)
         return 2
@@ -223,6 +238,9 @@ def _flip_from_pool(args: argparse.Namespace) -> int:
     if args.seed is not None:
         print("coin flip: --seed replays the simulator; it needs --sim", file=sys.stderr)
         return 2
+    if args.shots is not None and (args.json or args.quiet):
+        print("coin flip: --json and --quiet describe one flip; leave out --shots", file=sys.stderr)
+        return 2
     try:
         draws = Pool(args.pool).take(args.shots or 1)
     except EmptyPoolError as error:
@@ -233,7 +251,26 @@ def _flip_from_pool(args: argparse.Namespace) -> int:
         return 1
     bits = np.concatenate([d.bits for d in draws])
     if args.shots is None:
-        print(FACES[str(bits[0])].upper())
+        (draw,) = draws
+        flip = receipt(draw, datetime.now(UTC))
+        if args.json:
+            print(json.dumps(flip, indent=2))
+        elif args.quiet:
+            print(flip["outcome"])
+        else:
+            print(flip["outcome"])
+            print(
+                f"  {flip['backend']} · qubit {flip['qubit']} · job {flip['job_id']} · "
+                f"harvested {str(flip['harvested_at'])[:10]}"
+            )
+            print(
+                f"  run {flip['run']} · bit {flip['offset'] + 1:,} of {flip['batch_bits']:,} "
+                f"in batch {flip['batch']}"
+            )
+            print(
+                f"  Toeplitz extraction at {flip['entropy_per_bit']:.4f} bits per shot, "
+                f"ε = {flip['epsilon']:.1e}"
+            )
         return 0
     width = len(f"{args.shots:,}")
     for outcome, face in FACES.items():

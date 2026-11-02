@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/oddurs/fairest-coin/blob/main/docs/receipt.schema.json",
+  "title": "Flip receipt",
+  "description": "Printed by `coin flip --json`: one flip from the entropy pool, and everything it came from. With the archived run in data/runs and the batch's recorded seed, the bit can be recomputed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "outcome",
+    "bit",
+    "flipped_at",
+    "backend",
+    "qubit",
+    "job_id",
+    "run",
+    "harvested_at",
+    "batch",
+    "offset",
+    "batch_bits",
+    "extractor",
+    "entropy_per_bit",
+    "epsilon"
+  ],
+  "properties": {
+    "outcome": {"type": "string", "enum": ["HEADS", "TAILS"], "description": "HEADS is 0, TAILS is 1."},
+    "bit": {"type": "integer", "enum": [0, 1]},
+    "flipped_at": {"type": "string", "description": "When the bit was spent, ISO 8601 in UTC."},
+    "backend": {"type": "string", "description": "The IBM device the shots ran on."},
+    "qubit": {"type": "integer", "description": "The physical qubit that was flipped."},
+    "job_id": {"type": "string", "description": "IBM's job id."},
+    "run": {"type": "string", "description": "The archived run's directory under data/runs/."},
+    "harvested_at": {"type": "string", "description": "When the batch entered the pool, ISO 8601 in UTC."},
+    "batch": {"type": "string", "description": "The pool batch the bit came from."},
+    "offset": {"type": "integer", "description": "The bit's position in its batch, from 0."},
+    "batch_bits": {"type": "integer", "description": "How many bits the batch holds."},
+    "extractor": {"type": "string", "enum": ["toeplitz"]},
+    "entropy_per_bit": {"type": "number", "description": "Min-entropy per shot the extraction spent: half the estimate."},
+    "epsilon": {"type": "number", "description": "Distance from uniform, if that min-entropy holds."}
+  }
+}

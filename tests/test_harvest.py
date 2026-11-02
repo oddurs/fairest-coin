@@ -138,7 +138,7 @@ def test_harvest_then_flip_then_run_dry(
     (batch,) = Pool().status()
 
     code, out, _ = cli_run(["flip"], capsys)
-    assert (code, out.strip() in {"HEADS", "TAILS"}) == (0, True)
+    assert (code, out.splitlines()[0] in {"HEADS", "TAILS"}) == (0, True)
     code, out, _ = cli_run(["pool"], capsys)
     assert f"{batch.total - 1:>10,}" in out
 
