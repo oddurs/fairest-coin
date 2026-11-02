@@ -22,10 +22,10 @@ One directory per job: `runs/<UTC date of submission>-<job id>/`, for example
 | --- | --- | --- |
 | `meta.json` | yes | the job: id, backend, qubits, shots, times, library versions |
 | `circuit.qasm` | yes | the OpenQASM 3 program as submitted, before transpilation |
-| `counts.json` | yes | outcome → number of shots |
+| `counts.json` or `counts.json.gz` | yes | outcome → number of shots |
 | `calibration.json.gz` | yes | the backend's calibration snapshot, gzipped JSON |
 | `prediction.json` | yes, unless waived | the forecast, written before submission |
-| `memory.txt` | no | the outcome of every shot, in order |
+| `memory.txt` or `memory.txt.gz` | no | the outcome of every shot, in order |
 | `prediction-dryrun.json` | no | the forecast from a rehearsal that submitted nothing |
 | `submit.py` | no | the exact script that produced the run |
 | `usage.json` | no | the final QPU usage, fetched after the job finished |
@@ -55,6 +55,13 @@ is heads and `1` is tails.
 
 Any other key (IBM's own `timestamps`, `transpiled_ops`, `qiskit_ibm_runtime`, the
 result-time `usage`) is kept as it was written and loads into `Run.extra`.
+
+### Plain or gzipped
+
+`counts` and `memory` may be stored plain or gzipped. Runs since 0068 write `counts.json.gz`
+and `memory.txt.gz`: a whole-chip run has about 100,000 distinct 156-bit outcomes, which is
+16 MB per file as text and about 2.4 MB gzipped. The loader reads either form, so earlier
+runs stay exactly as they were archived. A run holding both forms of one file is refused.
 
 ### `counts.json`
 

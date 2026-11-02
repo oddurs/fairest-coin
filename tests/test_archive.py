@@ -1,9 +1,11 @@
 import dataclasses
 import gzip
 import shutil
+from collections import Counter
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from coin import archive
@@ -125,10 +127,20 @@ def test_the_first_runs_qpu_time_comes_from_the_final_usage_record() -> None:
     assert run.qpu_seconds == 3
 
 
+def on_disk(directory: Path, name: str) -> Path:
+    """The file a run actually wrote for `name`: plain, or gzipped for counts and memory."""
+    packed = directory / f"{name}.gz"
+    return packed if packed.exists() else directory / name
+
+
+def overwrite(path: Path, text: str) -> None:
+    path.write_bytes(gzip.compress(text.encode()) if path.suffix == ".gz" else text.encode())
+
+
 @pytest.mark.parametrize("name", archive.REQUIRED)
 def test_a_missing_required_file_is_named(tmp_path: Path, name: str) -> None:
     directory = write_run(tmp_path, make_run())
-    (directory / name).unlink()
+    on_disk(directory, name).unlink()
     with pytest.raises(ArchiveError, match=name):
         load_run(directory)
 
@@ -136,7 +148,7 @@ def test_a_missing_required_file_is_named(tmp_path: Path, name: str) -> None:
 @pytest.mark.parametrize("name", archive.OPTIONAL)
 def test_an_optional_file_may_be_absent(tmp_path: Path, name: str) -> None:
     directory = write_run(tmp_path, make_run())
-    (directory / name).unlink()
+    on_disk(directory, name).unlink()
     assert load_run(directory).job_id == "testjob0000000000001"
 
 
@@ -145,8 +157,9 @@ def test_an_optional_file_may_be_absent(tmp_path: Path, name: str) -> None:
 )
 def test_malformed_json_is_named(tmp_path: Path, name: str) -> None:
     directory = write_run(tmp_path, make_run())
-    (directory / name).write_text('{"shots": 6,')
-    with pytest.raises(ArchiveError, match=name):
+    target = on_disk(directory, name)
+    overwrite(target, '{"shots": 6,')
+    with pytest.raises(ArchiveError, match="malformed JSON"):
         load_run(directory)
 
 
@@ -176,7 +189,7 @@ def test_calibration_that_is_not_gzip_is_named(tmp_path: Path) -> None:
 )
 def test_an_inconsistent_file_is_named(tmp_path: Path, name: str, content: str) -> None:
     directory = write_run(tmp_path, make_run())
-    (directory / name).write_text(content)
+    overwrite(on_disk(directory, name), content)
     with pytest.raises(ArchiveError, match=name):
         load_run(directory)
 
@@ -243,7 +256,7 @@ def test_a_failure_halfway_leaves_nothing_and_the_retry_succeeds(
 ) -> None:
     run = make_run()
 
-    def disk_full(_data: bytes, mtime: float | None = None) -> bytes:
+    def disk_full(*_args: object, **_kwargs: object) -> bytes:
         raise OSError("No space left on device")
 
     # The calibration is written after meta, circuit and counts: a genuine partial write.
@@ -254,3 +267,32 @@ def test_a_failure_halfway_leaves_nothing_and_the_retry_succeeds(
 
     monkeypatch.undo()
     assert load_run(write_run(tmp_path, run)) == run
+
+
+def test_new_runs_gzip_counts_and_memory(tmp_path: Path) -> None:
+    directory = write_run(tmp_path, make_run())
+    names = {path.name for path in directory.iterdir()}
+    assert {"counts.json.gz", "memory.txt.gz"} <= names
+    assert not {"counts.json", "memory.txt"} & names
+
+
+@pytest.mark.parametrize("name", ["counts.json", "memory.txt"])
+def test_both_forms_of_one_file_are_refused(tmp_path: Path, name: str) -> None:
+    directory = write_run(tmp_path, make_run())
+    shutil.copy(on_disk(directory, name), directory / name)
+    with pytest.raises(ArchiveError, match="both exist"):
+        load_run(directory)
+
+
+def test_a_whole_chip_run_stays_small(tmp_path: Path) -> None:
+    rng = np.random.default_rng(0)
+    shots, width = 100_000, 156
+    bits = rng.integers(0, 2, size=(shots, width), dtype=np.uint8)
+    memory = tuple("".join(map(str, row)) for row in bits)
+    run = make_run(
+        shots=shots, memory=memory, counts=dict(Counter(memory)), qubits=tuple(range(width))
+    )
+    directory = write_run(tmp_path, run)
+    size = sum(path.stat().st_size for path in directory.iterdir())
+    assert size < 6_000_000, f"{size / 1e6:.1f} MB"
+    assert load_run(directory) == run
