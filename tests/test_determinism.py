@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from hypothesis import settings
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # Loads the project's profile, then records every example one property test is given.
@@ -30,3 +32,7 @@ def draws(profile: str | None) -> str:
 
 def test_property_tests_draw_the_same_examples_every_run() -> None:
     assert draws(None) == draws(None)
+
+
+def test_no_example_has_a_wall_clock_deadline() -> None:
+    assert settings().deadline is None
