@@ -21,7 +21,7 @@
 
 ## v0.3.1 — Hardening
 
-`#######···` 64% · 7 of 11 done · due 2026-11-09
+`########··` 73% · 8 of 11 done · due 2026-11-09
 
 v0.3.1: every defect found by the review of the first three milestones is fixed, the essay
 
