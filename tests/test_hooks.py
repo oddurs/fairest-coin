@@ -20,7 +20,7 @@ def run_hook(tmp_path: Path, message: str) -> subprocess.CompletedProcess[str]:
     [
         "feat(sim): simulate circuits as statevectors",
         "fix!: change the outcome order",
-        "docs: update CLAUDE.md for the new workflow",
+        "docs: update AGENTS.md for the new workflow",
         "chore(deps): bump numpy\n\nRefs: 0008",
         "Merge branch 'main' into feat/x",
         "test: " + "a" * 58,  # exactly 64 characters, the limit

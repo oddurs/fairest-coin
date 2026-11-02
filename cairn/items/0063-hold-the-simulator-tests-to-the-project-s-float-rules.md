@@ -19,7 +19,7 @@ area: sim
 ## What happens
 
 `tests/test_sim.py` compares float probabilities with `==` in about eight places and calls
-1e-10 "exact algebra", while `.claude/rules/physics.md` says never compare floats with `==`
+1e-10 "exact algebra", while `docs/conventions.md` says never compare floats with `==`
 and exact algebra uses 1e-12. Chapter 1 tells readers that every test compares with a
 stated tolerance, which is currently false.
 

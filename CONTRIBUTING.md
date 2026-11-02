@@ -25,6 +25,11 @@ scripts/agent done                  # removes the worktree and branch, fast-forw
 
 `scripts/agent list` shows every worktree with its PR state.
 
+`AGENTS.md` is the workflow in brief, for any contributor or tool. A tool's own files
+(instructions, settings) are local to your clone: list each in `.git/info/exclude`,
+directories without a trailing slash, and `scripts/agent start` links them from the
+primary checkout into every new worktree.
+
 Branch types: `feat fix chore docs perf refactor test`. When the work has a cairn item,
 start the slug with its id: `feat/0009-statevector-simulator`.
 
@@ -66,6 +71,11 @@ Every figure in `docs/figures/` is rendered from `data/runs/` by `scripts/figure
 `build` fails if a committed figure differs from a fresh render. To add one, write a
 function from the runs directory to a matplotlib `Figure` in `src/coin/figures.py`, add it
 to `FIGURES`, run `scripts/figures`, and commit the SVG it writes.
+
+## Physics conventions
+
+Qubit order, heads and tails, tolerances and the rules for archived runs are in
+[docs/conventions.md](docs/conventions.md).
 
 ## Hardware runs
 

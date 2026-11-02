@@ -95,7 +95,7 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 
 ## v0.4 — The certified coin
 
-`··········` 0% · 0 of 13 done · due 2026-12-27
+`#·········` 7% · 1 of 14 done · due 2026-12-27
 
 A Bell test run on real hardware, with the measurement settings chosen by the v0.3 coin,
 
@@ -114,6 +114,10 @@ A Bell test run on real hardware, with the measurement settings chosen by the v0
 - [ ] [`0047`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0047-write-chapter-5-the-proof.md) Write chapter 5: the proof <sup>docs · p0 · essay</sup>
 - [ ] [`0048`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0048-cut-v0-4-0.md) Cut v0.4.0 <sup>chore · p0 · tooling</sup>
 - [ ] [`0066`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0066-move-the-ibm-adapter-to-the-client-side-executor-sampler.md) Move the IBM adapter to the client-side executor Sampler <sup>chore · p1 · hardware</sup>
+
+### done
+
+- [x] [`0086`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0086-keep-agent-instructions-out-of-the-repository.md) Keep agent instructions out of the repository <sup>chore · p2 · tooling</sup>
 
 ## v1.0 — The promise
 

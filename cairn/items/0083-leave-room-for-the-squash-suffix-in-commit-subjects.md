@@ -25,4 +25,4 @@ than the 72-character limit the hooks enforce on the branch.
 
 ## Result
 
-commit-msg caps subjects at 64 characters, so the squash subject with " (#N)" stays within 72; tested, and CONTRIBUTING.md and CLAUDE.md say why.
+commit-msg caps subjects at 64 characters, so the squash subject with " (#N)" stays within 72; tested, and CONTRIBUTING.md and AGENTS.md say why.

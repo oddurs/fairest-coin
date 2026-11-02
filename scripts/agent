@@ -78,6 +78,24 @@ cmd_doctor() {
   echo "✓ doctor clean"
 }
 
+# What this clone keeps out of git (.git/info/exclude), such as a tool's own instructions,
+# exists only in the primary checkout. Link each literal path into the new worktree so
+# every checkout sees it. A pattern names no file that exists, so it is never linked.
+link_local() {
+  exclude=$common/info/exclude
+  [ -f "$exclude" ] || return 0
+  grep -v '^[[:space:]]*#' "$exclude" | while IFS= read -r entry; do
+    path=${entry#/}
+    path=${path%/}
+    if [ ! -e "$root/$path" ] || [ -e "$1/$path" ] || [ -L "$1/$path" ]; then
+      continue
+    fi
+    mkdir -p "$(dirname "$1/$path")"
+    ln -s "$root/$path" "$1/$path"
+    say "linked $path from the primary checkout"
+  done
+}
+
 cmd_start() {
   [ $# -eq 1 ] || die "usage: scripts/agent start <type>/<slug>"
   branch=$1
@@ -92,6 +110,7 @@ cmd_start() {
   say "creating $branch from origin/$base at $dir"
   mkdir -p "$(dirname "$dir")"
   git -C "$root" worktree add --quiet --no-track -b "$branch" "$dir" "origin/$base"
+  link_local "$dir"
   echo "$dir"
 }
 

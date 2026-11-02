@@ -44,6 +44,10 @@ scripts/agent pr --body-file /path/to/body.md
 scripts/agent done                         # after the squash merge
 ```
 
+A tool's own instruction files stay out of git: list them in `.git/info/exclude` (a
+directory without its trailing slash) and `scripts/agent start` links them into each new
+worktree.
+
 Branch types: `feat fix chore docs perf refactor test`; the slug starts with the cairn id.
 Commits are Conventional Commits, subject ≤ 64 characters (the squash merge adds " (#N)" to
 reach 72), no trailing period, body says why, `Refs: 0009` trailer. A PR body states the problem, the approach, and what a reviewer
@@ -54,7 +58,7 @@ should look at sceptically — say where it is weak.
 uv for everything, ruff for lint and format, ty for types, pytest with plain asserts.
 Annotate every public signature. numpy is the only runtime dependency until Qiskit
 arrives, and Qiskit is only ever imported in `src/coin/ibm.py`. Physics conventions are in
-`.claude/rules/physics.md`.
+`docs/conventions.md`.
 
 A bug fix arrives with the test that would have caught it. Comments say why.
 
