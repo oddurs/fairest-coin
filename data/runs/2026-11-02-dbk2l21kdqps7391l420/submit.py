@@ -1,0 +1,1 @@
+coin run chip-map --backend ibm_marrakesh --shots 100000 --submit

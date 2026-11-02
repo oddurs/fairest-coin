@@ -38,3 +38,7 @@ Chapter 3 material from spike 0028: qubit 88. Von Neumann makes its bits pass ev
 ## 2026-11-02
 
 Chapter 3 material from 0032: verifiability against secrecy. Publishing a harvest's raw shots with the extraction seed lets anyone check every flip it produced, and predict every flip it has not produced yet. So the order matters: spend, then publish.
+
+## 2026-11-02
+
+From spike 0069: per-qubit coin bias does not persist (correlation −0.05 between chip maps 4.7 h apart; qubit 59 went 79.8% → 49.8%). Chapter 2's worst misses were readout excursions the calibration recorded afterwards. This is the strongest argument for extraction over prediction: the bias is not a fixed property to correct, so remove it without knowing it. Harvest run 2026-11-02-dbk2ldpffo6c73ban1n0 (qubit 104, 100,000 shots, 44,144 bits pooled) is kept out of git, in the main checkout's data/runs, until its batch is spent; the chapter can spend it as its demonstration, then commit the run.
