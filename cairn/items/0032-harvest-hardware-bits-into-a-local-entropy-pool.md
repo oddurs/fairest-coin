@@ -9,6 +9,7 @@ depends_on:
 - 22
 - 28
 - 30
+- 70
 created: 2026-11-01
 updated: 2026-11-01
 priority: p0
@@ -35,3 +36,7 @@ unspent bit.
 - [ ] An empty pool exits non-zero and says to run `coin harvest`
 - [ ] `coin pool` shows remaining bits per batch
 - [ ] Raw harvested bits are archived like any other run
+
+## 2026-11-01
+
+From spike 0028: extract with Toeplitz hashing (0070), not von Neumann. And screen each batch's qubit with analysis/independence.py's tests: 5 of 156 qubits had time structure in the chip-map run, and which ones will change between runs.

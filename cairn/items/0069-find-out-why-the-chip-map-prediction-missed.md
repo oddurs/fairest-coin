@@ -51,3 +51,7 @@ the coin a second time in the same job to separate drift from bias. Estimate the
 ## 2026-11-01
 
 A later calibration (owner's dry run, 2026-11-02 ~02:53 UTC, not archived) newly flags qubits 34, 48 and 59 as readout-broken: p(1|0) = 0.56, 0.65 and 0.75. In the chip-map run they came up tails 65.2%, 64.9% and 79.8%, among the worst misses. So for these three the miss was most likely readout that went bad before the calibration caught it, not state preparation. The spike's prepare-|0⟩ circuit tests exactly this; archive a fresh calibration with it.
+
+## 2026-11-01
+
+From spike 0028: coupled qubits 113 and 119, both excluded by the calibration model, are anticorrelated at −123σ (r ≈ −0.39) in the same shot. No other coupled pair shows crosstalk. Worth one line in the spike's readout circuits.

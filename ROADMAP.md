@@ -50,13 +50,12 @@
 
 ## v0.3 — The fair coin
 
-`··········` 0% · 0 of 10 done · due 2026-12-06
+`#·········` 9% · 1 of 11 done · due 2026-12-06
 
 `coin harvest` collects real hardware bits, debiases them, and fills a local pool;
 
 ### backlog
 
-- [ ] [`0028`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0028-are-the-hardware-bits-independent.md) Are the hardware bits independent? <sup>spike · p0 · extract</sup>
 - [ ] [`0029`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0029-mitigate-readout-error-on-estimated-distributions.md) Mitigate readout error on estimated distributions <sup>feature · p2 · extract</sup>
 - [ ] [`0030`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0030-debias-bits-with-the-von-neumann-extractor.md) Debias bits with the von Neumann extractor <sup>feature · p0 · extract</sup>
 - [ ] [`0031`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0031-build-a-randomness-test-battery-from-scratch.md) Build a randomness test battery from scratch <sup>feature · p0 · extract</sup>
@@ -66,6 +65,11 @@
 - [ ] [`0035`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0035-write-chapter-3-make-it-fair.md) Write chapter 3: make it fair <sup>docs · p0 · essay</sup>
 - [ ] [`0036`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0036-cut-v0-3-0.md) Cut v0.3.0 <sup>chore · p0 · tooling</sup>
 - [ ] [`0069`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0069-find-out-why-the-chip-map-prediction-missed.md) Find out why the chip-map prediction missed <sup>spike · p1 · noise</sup>
+- [ ] [`0070`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0070-extract-with-toeplitz-hashing-from-a-min-entropy-estimate.md) Extract with Toeplitz hashing from a min-entropy estimate <sup>feature · p0 · extract</sup>
+
+### done
+
+- [x] [`0028`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0028-are-the-hardware-bits-independent.md) Are the hardware bits independent? <sup>spike · p0 · extract</sup>
 
 ## v0.4 — The certified coin
 
