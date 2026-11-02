@@ -25,7 +25,15 @@ import numpy as np
 
 from coin.archive import Prediction, Run, load_run
 from coin.circuit import Circuit
-from coin.extract import SAFETY, Bits, Extraction, secure_length, seed_bits, toeplitz_extract
+from coin.extract import (
+    SAFETY,
+    Bits,
+    Extraction,
+    min_entropy,
+    secure_length,
+    seed_bits,
+    toeplitz_extract,
+)
 from coin.hardware import Submission, Transport, submit
 from coin.noise import CalibrationModel, model_from_calibration, predict_tails
 from coin.pool import Pool
@@ -34,17 +42,31 @@ from coin.pool import Pool
 NATIVE_COIN = Circuit(1).rz(math.pi / 2, 0).sx(0).rz(math.pi / 2, 0).measure(0, 0)
 
 
+# A harvest is refused if it is not forecast to yield at least this many bits: near zero the
+# forecast is noisy, and a few bits are not worth QPU time.
+MIN_HARVEST_BITS = 1_000
+# The forecast runs the estimator on this many simulated samples and takes the worst.
+_FORECAST_SAMPLES = 5
+
+
 @dataclass(frozen=True)
 class HarvestPlan:
     submission: Submission
     qubit: int
     p_tails: float
+    # The worst of several simulated runs, so a harvest the forecast allows reliably yields
+    # bits. A real qubit is rarely as steady as the simulation, and may give less.
+    expected_bits: int
 
-    @property
-    def expected_bits(self) -> int:
-        """About how many bits extraction should yield, if the coin behaves as predicted."""
-        h = -math.log2(max(self.p_tails, 1 - self.p_tails))
-        return secure_length(self.submission.shots, SAFETY * h)
+
+def forecast_bits(shots: int, p_tails: float) -> int:
+    """How many bits a harvest of `shots` should yield: the estimator's own verdict on a
+    simulated coin at the predicted bias, at its worst over a few seeds (repeatable)."""
+    worst = min(
+        min_entropy((np.random.default_rng(seed).random(shots) < p_tails).astype(np.uint8))
+        for seed in range(_FORECAST_SAMPLES)
+    )
+    return secure_length(shots, SAFETY * worst)
 
 
 @dataclass(frozen=True)
@@ -87,7 +109,7 @@ def plan(backend: str, calibration: dict[str, Any], shots: int) -> HarvestPlan:
         calibration=calibration,
         prediction=prediction,
     )
-    return HarvestPlan(submission, qubit, p_tails)
+    return HarvestPlan(submission, qubit, p_tails, forecast_bits(shots, p_tails))
 
 
 def shots_of(run: Run) -> Bits:
@@ -108,15 +130,18 @@ def harvest(
     If extraction still fails afterwards, the shots are safe in the archive and
     `extract_run` can try again.
     """
-    if chosen.expected_bits < 1:
+    if chosen.expected_bits < MIN_HARVEST_BITS:
         raise ValueError(
-            f"{chosen.submission.shots:,} shots would yield no bits after extraction; ask for more"
+            f"{chosen.submission.shots:,} shots are forecast to yield {chosen.expected_bits:,} "
+            f"bits, under the {MIN_HARVEST_BITS:,} worth a harvest; ask for more"
         )
     pool.require_writable()
     run_dir = submit(transport, chosen.submission, runs_dir, submit_script=submit_script)
     try:
         return extract_run(run_dir, pool)
-    except (ValueError, OSError) as error:
+    # The QPU time is spent and the run is safe in the archive: whatever went wrong after
+    # that, say so and how to finish.
+    except Exception as error:
         raise HarvestError(
             f"job ran and is archived at {run_dir}, but extraction failed: {error}; "
             f"retry with `coin harvest --from-run {run_dir}`"

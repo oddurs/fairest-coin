@@ -21,7 +21,7 @@
 
 ## v0.3.1 — Hardening
 
-`··········` 0% · 0 of 11 done · due 2026-11-09
+`#·········` 9% · 1 of 11 done · due 2026-11-09
 
 v0.3.1: every defect found by the review of the first three milestones is fixed, the essay
 
@@ -29,7 +29,6 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 
 - [ ] [`0075`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0075-never-lose-a-submitted-job-s-shots-prediction-or-calibration.md) Never lose a submitted job's shots, prediction or calibration <sup>bug · p0 · hardware</sup>
 - [ ] [`0076`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0076-scrub-encoded-credentials-and-check-classical-bits-in-the-ibm-adapter.md) Scrub encoded credentials and check classical bits in the IBM adapter <sup>bug · p2 · hardware</sup>
-- [ ] [`0077`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0077-estimate-min-entropy-honestly-on-short-inputs-and-pre-flight-harvests-by-it.md) Estimate min-entropy honestly on short inputs, and pre-flight harvests by it <sup>bug · p0 · extract</sup>
 - [ ] [`0078`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0078-pool-each-job-once-only-harvest-runs-and-publish-the-extraction-record.md) Pool each job once, only harvest runs, and publish the extraction record <sup>bug · p1 · extract</sup>
 - [ ] [`0079`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0079-report-a-chip-map-whose-calibration-had-no-readout-length.md) Report a chip map whose calibration had no readout length <sup>bug · p2 · hardware</sup>
 - [ ] [`0080`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0080-stop-counting-gate-relaxation-twice-in-the-noise-model.md) Stop counting gate relaxation twice in the noise model <sup>bug · p3 · noise</sup>
@@ -38,6 +37,10 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 - [ ] [`0083`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0083-leave-room-for-the-squash-suffix-in-commit-subjects.md) Leave room for the squash suffix in commit subjects <sup>chore · p3 · tooling</sup>
 - [ ] [`0084`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0084-rebuild-the-v0-4-plan-on-what-v0-2-and-v0-3-found.md) Rebuild the v0.4 plan on what v0.2 and v0.3 found <sup>chore · p0 · chsh</sup>
 - [ ] [`0085`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0085-cut-v0-3-1.md) Cut v0.3.1 <sup>chore · p0 · tooling</sup>
+
+### done
+
+- [x] [`0077`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0077-estimate-min-entropy-honestly-on-short-inputs-and-pre-flight-harvests-by-it.md) Estimate min-entropy honestly on short inputs, and pre-flight harvests by it <sup>bug · p0 · extract</sup>
 
 ## v0.2 — The real coin
 

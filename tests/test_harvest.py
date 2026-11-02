@@ -176,7 +176,7 @@ def test_a_harvest_too_small_to_yield_a_bit_is_refused_before_it_runs(
 ) -> None:
     transport = FakeTransport(calibration)
     chosen = harvest.plan("b", calibration, 100)  # 100 · ½ · ~1 bit − 64 < 1
-    with pytest.raises(ValueError, match="no bits"):
+    with pytest.raises(ValueError, match="worth a harvest"):
         harvest.harvest(transport, chosen, tmp_path / "runs", Pool(tmp_path / "pool"), "x")
     assert transport.runs == []
 
@@ -298,3 +298,55 @@ def test_the_pool_table_lines_up(tmp_path: Path, capsys: pytest.CaptureFixture[s
     assert code == 0
     # The last column is right-aligned, so aligned columns mean equal-length lines.
     assert len({len(line) for line in lines}) == 1, lines
+
+
+@pytest.mark.parametrize("shots", [4096, 10_000])
+@pytest.mark.parametrize("p_tails", [0.5, 0.53])
+def test_a_harvest_the_forecast_allows_does_extract(
+    calibration: dict[str, Any], shots: int, p_tails: float
+) -> None:
+    # Before 0077, 1,000 shots passed the forecast and then extracted nothing.
+    chosen = harvest.plan("b", calibration, shots)
+    assert chosen.expected_bits >= harvest.MIN_HARVEST_BITS
+    for seed in range(5):
+        x = (np.random.default_rng(100 + seed).random(shots) < p_tails).astype(np.uint8)
+        assert secure_length(shots, SAFETY * min_entropy(x)) >= 1
+
+
+@pytest.mark.parametrize("shots", [130, 1000, 2000])
+def test_the_forecast_refuses_harvests_too_small_to_be_worth_it(
+    calibration: dict[str, Any], tmp_path: Path, shots: int
+) -> None:
+    transport = FakeTransport(calibration)
+    chosen = harvest.plan("b", calibration, shots)
+    assert chosen.expected_bits < harvest.MIN_HARVEST_BITS
+    with pytest.raises(ValueError, match="worth a harvest"):
+        harvest.harvest(transport, chosen, tmp_path / "runs", Pool(tmp_path / "p"), "x")
+    assert transport.runs == []
+
+
+def test_from_run_does_not_claim_to_archive(
+    calibration: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    chosen = harvest.plan("b", calibration, SHOTS)
+    run_dir = harvest.submit(FakeTransport(calibration), chosen.submission, tmp_path / "runs")
+    code, out, _ = cli_run(["harvest", "--from-run", str(run_dir)], capsys)
+    assert code == 0
+    assert not out.startswith("archived")
+    assert out.startswith(f"run          {run_dir}")
+
+
+def test_an_unreadable_archived_run_still_gets_the_recovery_message(
+    calibration: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from coin.archive import ArchiveError  # noqa: PLC0415 - only this test raises it
+
+    def unreadable(_path: Path) -> None:
+        raise ArchiveError("meta.json: malformed JSON")
+
+    monkeypatch.setattr(harvest, "load_run", unreadable)
+    chosen = harvest.plan("b", calibration, SHOTS)
+    with pytest.raises(harvest.HarvestError, match="--from-run"):
+        harvest.harvest(
+            FakeTransport(calibration), chosen, tmp_path / "runs", Pool(tmp_path / "p"), "x"
+        )

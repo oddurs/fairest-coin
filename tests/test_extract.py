@@ -367,3 +367,30 @@ def test_the_safety_margin_stays_under_a_short_dwell_telegraph(dwell: int, bound
     state = np.bitwise_xor.accumulate(switch.astype(np.uint8))
     x = (rng.random(100_000) < np.where(state == 1, 0.8, 0.2)).astype(np.uint8)
     assert SAFETY * min_entropy(x) <= bound
+
+
+@settings(max_examples=30)
+@given(st.integers(min_value=200, max_value=6000), seed)
+def test_a_fair_source_is_never_scored_as_predictable_for_want_of_data(n: int, s: int) -> None:
+    # A guesser scored on a handful of guesses has a bound near 1. Before 0077, 1,000 fair
+    # bits scored 0 bits per bit; now each guesser needs 100 guesses to say anything.
+    h = min_entropy(coin(0.5, n, s))
+    # Measured over seeds: 0.18 at 200 bits, 0.41 at 1,000, 0.55 at 2,000. Short inputs
+    # are honestly uncertain; a band, not a promise.
+    assert h > 0.12
+    if n >= 1000:
+        assert h > 0.35
+
+
+@pytest.mark.parametrize("n", [200, 500, 1000, 2000, 6000])
+@pytest.mark.parametrize("block", [5, 20, 50, 100, 300])
+def test_a_repeated_block_scores_zero_at_any_length(n: int, block: int) -> None:
+    # The unsafe direction: a short deterministic input must never look random. An early
+    # version of the 0077 fix scored a 20-bit block repeated to 1,000 bits at 0.54. Blocks
+    # up to 256 bits are also caught by the phase guesser; a 300-bit block only by a lag,
+    # which needs its own 100 guesses. Short lengths are listed outright: drawn at random,
+    # they were too rarely tried.
+    if n < 2 * block:
+        pytest.skip("the block does not repeat within n bits")
+    x = np.resize(coin(0.5, block, seed=block), n)
+    assert min_entropy(x) == pytest.approx(0.0, abs=0.02)
