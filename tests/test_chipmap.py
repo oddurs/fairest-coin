@@ -1,4 +1,5 @@
 import json
+import math
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import replace
@@ -364,3 +365,16 @@ def test_a_one_qubit_chip_map_is_reported() -> None:
     }
     text = report(replace(run, prediction=Prediction(run.prediction.written_at, one)))
     assert re.search(r"correlation with measured\s+—\s+—", text)
+
+
+def test_drift_uses_the_pooled_rate_for_its_spread() -> None:
+    # Qubit 0 is tails 1 in 10 in the first half and 5 in 10 in the second. The z the report
+    # counts divides the change by the spread under one pooled rate, 6/20.
+    tails = np.zeros((20, 2), dtype=bool)
+    tails[:10, 0] = [True] + [False] * 9
+    tails[10:, 0] = [True] * 5 + [False] * 5
+    tails[:, 1] = [True, False] * 10
+    z = _drift(memory_run(tails))
+    pooled = 6 / 20
+    expected = (0.5 - 0.1) / math.sqrt(pooled * (1 - pooled) * (1 / 10 + 1 / 10))
+    assert z[0] == pytest.approx(expected, abs=1e-12)

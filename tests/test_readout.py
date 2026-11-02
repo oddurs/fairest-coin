@@ -184,3 +184,30 @@ def test_submitting_archives_and_reports(
     assert "read within 3σ of their published error" in out  # noqa: RUF001 - σ is the display text
     (run_dir,) = tmp_path.iterdir()
     assert load_run(run_dir).prediction is not None
+
+
+def test_measured_uses_each_runs_own_shot_count(
+    calibration: dict[str, Any], tmp_path: Path
+) -> None:
+    # The two calibration jobs need not have the same number of shots.
+    runs = {}
+    for prepare, shots in ((0, 20_000), (1, 8_000)):
+        chosen = readout.plan("b", calibration, shots, prepare)
+        runs[prepare] = load_run(
+            submit(FakeTransport(calibration, prepare), chosen.submission, tmp_path / str(prepare))
+        )
+    got = readout.measured(runs[0], runs[1])
+    q = min(got)
+    ones_0 = sum(c for o, c in runs[0].counts.items() if o[len(o) - 1 - q] == "1")
+    ones_1 = sum(c for o, c in runs[1].counts.items() if o[len(o) - 1 - q] == "1")
+    assert got[q].p1_given_0 == pytest.approx(ones_0 / 20_000, abs=1e-12)
+    assert got[q].p0_given_1 == pytest.approx(1 - ones_1 / 8_000, abs=1e-12)
+
+
+def test_a_readout_published_as_worse_than_a_coin_is_still_tested() -> None:
+    # Qubit 119 published p(0|1) = 0.54 in the first chip map's calibration: exactly the kind
+    # of readout this run exists to check, not one to drop.
+    calibration = load_run(ROOT / "data/runs/2026-11-02-dbjuh5d6p51s73cljo60").calibration
+    chosen = readout.plan("b", calibration, 1000, 1)
+    assert 119 in chosen.published
+    assert chosen.published[119] == pytest.approx(0.5400390625, abs=1e-12)
