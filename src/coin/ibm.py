@@ -22,14 +22,11 @@ from typing import Any
 from qiskit import qasm3, transpile
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
 
-from coin.compile import NATIVE
 from coin.hardware import JobResult
 
 TOKEN = "QISKIT_IBM_TOKEN"
 INSTANCE = "QISKIT_IBM_INSTANCE"
 CHANNEL = "ibm_quantum_platform"
-# Mapping onto physical qubits may add these; anything else means Qiskit changed the circuit.
-_ALLOWED_AFTER_MAPPING = NATIVE | {"measure", "barrier"}
 
 
 class MissingCredentialsError(ValueError):
@@ -57,37 +54,47 @@ class IBMTransport:
         return json.loads(json.dumps(properties, default=str))
 
     def run(self, backend: str, qasm: str, layout: Sequence[int], shots: int) -> JobResult:
-        return self._guard(lambda: self._run(backend, qasm, layout, shots))
-
-    def _run(self, backend_name: str, qasm: str, layout: Sequence[int], shots: int) -> JobResult:
-        backend = self._service.backend(backend_name)
-        isa = transpile(
-            qasm3.loads(qasm), backend=backend, initial_layout=list(layout), optimization_level=0
-        )
-        executed = {name: int(count) for name, count in isa.count_ops().items()}
-        if changed := set(executed) - _ALLOWED_AFTER_MAPPING:
-            raise IBMError(
-                f"mapping introduced {sorted(changed)}; refusing to run a changed circuit"
-            )
-
-        sampler = sampler_for(backend)
+        target, isa, executed = self._guard(lambda: self._map(backend, qasm, layout))
+        sampler = self._guard(lambda: sampler_for(target))
         options = _plain(sampler.options)
-
         submitted_at = datetime.now(UTC)
-        job = sampler.run([isa], shots=shots)
+        job = self._guard(lambda: sampler.run([isa], shots=shots))
+        # From here the QPU time is spent: every failure must name the job so it can be fetched.
+        job_id = self._guard(job.job_id)
+        return self._guard(
+            lambda: self._collect(job, job_id, submitted_at, executed, options),
+            job_id=job_id,
+        )
+
+    def _map(
+        self, backend_name: str, qasm: str, layout: Sequence[int]
+    ) -> tuple[Any, Any, dict[str, int]]:
+        backend = self._service.backend(backend_name)
+        circuit = qasm3.loads(qasm)
+        isa = transpile(circuit, backend=backend, initial_layout=list(layout), optimization_level=0)
+        # Mapping may only place each virtual qubit on its physical qubit. Routing inserts
+        # swaps built from native gates, so comparing gate names would not catch it: compare
+        # every instruction, its angles and its physical qubits, in order.
+        expected = _instructions(circuit, list(layout))
+        if _instructions(isa, list(range(isa.num_qubits))) != expected:
+            raise IBMError("mapping changed the circuit (routing or rewriting); refusing to run it")
+        return backend, isa, {name: int(count) for name, count in isa.count_ops().items()}
+
+    def _collect(
+        self,
+        job: Any,
+        job_id: str,
+        submitted_at: datetime,
+        executed: dict[str, int],
+        options: dict[str, Any],
+    ) -> JobResult:
         result = job.result()
         finished_at = datetime.now(UTC)
-        try:
-            memory = tuple(result[0].data.c.get_bitstrings())
-        except AttributeError as error:
-            # The job ran and its QPU time is spent; say how to recover the result.
-            raise IBMError(
-                f"job {job.job_id()} finished but its result was unreadable: {error}"
-            ) from None
+        memory = tuple(result[0].data.c.get_bitstrings())
         usage = job.metrics().get("usage")
         quantum = usage.get("quantum_seconds") if isinstance(usage, dict) else None
         return JobResult(
-            job_id=job.job_id(),
+            job_id=job_id,
             submitted_at=submitted_at,
             finished_at=finished_at,
             memory=memory,
@@ -97,15 +104,21 @@ class IBMTransport:
             options=options,
         )
 
-    def _guard[T](self, call: Callable[[], T]) -> T:
+    def _guard[T](self, call: Callable[[], T], *, job_id: str | None = None) -> T:
+        failure = ""
         try:
             return call()
-        except IBMError as error:
-            raise IBMError(self._scrub(str(error))) from None
         # Qiskit and its HTTP stack raise many unrelated types, and any of them may echo a
         # credential; translating them all here is the one place that can scrub it.
+        except IBMError as error:
+            failure = self._scrub(str(error))
         except Exception as error:
-            raise IBMError(f"{type(error).__name__}: {self._scrub(str(error))}") from None
+            failure = f"{type(error).__name__}: {self._scrub(str(error))}"
+        if job_id is not None:
+            failure = f"job {job_id} ran, but {failure}; fetch its result by that id"
+        # Raised outside the except block so the unscrubbed error is neither the cause nor
+        # the context of this one, and never prints in a chained traceback.
+        raise IBMError(failure)
 
     def _scrub(self, text: str) -> str:
         return text.replace(self._token, f"<{TOKEN}>").replace(self._instance, f"<{INSTANCE}>")
@@ -144,3 +157,18 @@ def _plain(options: Any) -> dict[str, Any]:
         return fields if fields else repr(value)
 
     return json.loads(json.dumps(options.__dict__, default=encode))
+
+
+def _instructions(
+    circuit: Any, physical: list[int]
+) -> list[tuple[str, tuple[float, ...], tuple[int, ...]]]:
+    """Each instruction as (name, angles, physical qubits); barriers carry no physics."""
+    found = []
+    for instruction in circuit.data:
+        name = instruction.operation.name
+        if name == "barrier":
+            continue
+        qubits = tuple(physical[circuit.find_bit(q).index] for q in instruction.qubits)
+        angles = tuple(round(float(p), 12) for p in instruction.operation.params)
+        found.append((name, angles, qubits))
+    return found

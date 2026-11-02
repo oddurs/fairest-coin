@@ -6,6 +6,9 @@ not written first; QPU seconds are too scarce to spend on a run that cannot be a
 The transport, real or fake, only carries a circuit there and the shots back.
 """
 
+import json
+import os
+import tempfile
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -14,7 +17,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from coin import __version__
-from coin.archive import Prediction, Run, write_run
+from coin.archive import ArchiveError, Prediction, Run, write_run
 from coin.circuit import Circuit
 from coin.compile import to_qasm
 
@@ -81,9 +84,36 @@ def submit(
     if written.tzinfo is None or written >= datetime.now(UTC):
         raise ValueError("the prediction must be written, with a timezone, before submission")
     qasm = to_qasm(submission.circuit)
+    # Everything that could stop the run being archived is checked while it is still free.
+    _require_writable(runs_dir)
+    for label, data in (
+        ("calibration", submission.calibration),
+        ("prediction", submission.prediction.values),
+    ):
+        try:
+            json.dumps(data)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"the {label} cannot be archived as JSON: {error}") from error
 
     result = transport.run(submission.backend, qasm, submission.layout, submission.shots)
+    try:
+        return _archive(submission, result, qasm, runs_dir, submit_script)
+    except Exception as error:
+        # The QPU time is spent: whatever went wrong, keep the shots and say where they are.
+        saved = _save_unarchived(runs_dir, submission, result)
+        raise ArchiveError(
+            f"job {result.job_id} ran but could not be archived ({error}); "
+            f"its raw result is in {saved}"
+        ) from error
 
+
+def _archive(
+    submission: Submission,
+    result: JobResult,
+    qasm: str,
+    runs_dir: Path,
+    submit_script: str | None,
+) -> Path:
     run = Run(
         job_id=result.job_id,
         backend=submission.backend,
@@ -103,3 +133,34 @@ def submit(
         extra={"executed_ops": result.executed_ops, "options": result.options},
     )
     return write_run(runs_dir, run)
+
+
+def _require_writable(runs_dir: Path) -> None:
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    if not os.access(runs_dir, os.W_OK):
+        raise ValueError(f"{runs_dir} is not writable, so a run there could not be archived")
+
+
+def _save_unarchived(runs_dir: Path, submission: Submission, result: JobResult) -> Path:
+    """Dump a finished job's raw result where it can be recovered by hand."""
+    record = {
+        "job_id": result.job_id,
+        "backend": submission.backend,
+        "layout": list(submission.layout),
+        "shots": submission.shots,
+        "submitted_at": result.submitted_at.isoformat(),
+        "finished_at": result.finished_at.isoformat(),
+        "memory": list(result.memory),
+        "usage": result.usage,
+        "prediction_written_at": submission.prediction.written_at.isoformat(),
+        "prediction": submission.prediction.values,
+    }
+    text = json.dumps(record, default=str)
+    for directory in (runs_dir, Path(tempfile.gettempdir())):
+        target = directory / f".unarchived-{result.job_id}.json"
+        try:
+            target.write_text(text)
+        except OSError:
+            continue
+        return target
+    raise ArchiveError(f"job {result.job_id}: its raw result could not be saved anywhere")

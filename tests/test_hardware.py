@@ -1,3 +1,4 @@
+import json
 import math
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -6,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from coin.archive import Prediction, load_run
+from coin.archive import ArchiveError, Prediction, load_run
 from coin.circuit import Circuit
 from coin.hardware import JobResult, Submission, submit
 
@@ -107,3 +108,35 @@ def test_credentials_never_reach_the_archive(
         content = path.read_bytes()
         assert b"sentinel-token-7f3a9" not in content
         assert b"crn:sentinel-instance" not in content
+
+
+def test_an_unwritable_archive_is_refused_before_submission(tmp_path: Path) -> None:
+    blocker = tmp_path / "runs"
+    blocker.write_text("a file where the runs directory should be")
+    transport = FakeTransport(("0",))
+    with pytest.raises(FileExistsError):
+        submit(transport, plan(), blocker)
+    assert transport.submitted == []
+
+
+def test_a_calibration_that_cannot_be_archived_is_refused_before_submission(
+    tmp_path: Path,
+) -> None:
+    transport = FakeTransport(("0",))
+    with pytest.raises(ValueError, match="calibration cannot be archived"):
+        submit(transport, plan(calibration={"when": datetime.now(UTC)}), tmp_path)
+    assert transport.submitted == []
+
+
+def test_a_job_that_cannot_be_archived_keeps_its_shots(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def disk_full(*_args: Any, **_kwargs: Any) -> Path:
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr("coin.hardware.write_run", disk_full)
+    with pytest.raises(ArchiveError, match="fakejob0001") as caught:
+        submit(FakeTransport(("0", "1", "1", "0")), plan(), tmp_path)
+    saved = tmp_path / ".unarchived-fakejob0001.json"
+    assert str(saved) in str(caught.value)
+    assert json.loads(saved.read_text())["memory"] == ["0", "1", "1", "0"]
