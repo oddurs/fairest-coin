@@ -50,7 +50,7 @@
 
 ## v0.3 — The fair coin
 
-`#########·` 82% · 9 of 11 done · due 2026-12-06
+`#########·` 83% · 10 of 12 done · due 2026-12-06
 
 `coin harvest` collects real hardware bits, debiases them, and fills a local pool;
 
@@ -70,6 +70,7 @@
 - [x] [`0034`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0034-draw-the-before-and-after-of-extraction.md) Draw the before-and-after of extraction <sup>feature · p2 · figures</sup>
 - [x] [`0069`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0069-find-out-why-the-chip-map-prediction-missed.md) Find out why the chip-map prediction missed <sup>spike · p1 · noise</sup>
 - [x] [`0070`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0070-extract-with-toeplitz-hashing-from-a-min-entropy-estimate.md) Extract with Toeplitz hashing from a min-entropy estimate <sup>feature · p0 · extract</sup>
+- [x] [`0072`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0072-make-time-dependent-tests-immune-to-a-sleeping-machine.md) Make time-dependent tests immune to a sleeping machine <sup>bug · p1 · tooling</sup>
 
 ## v0.4 — The certified coin
 

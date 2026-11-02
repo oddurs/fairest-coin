@@ -1,6 +1,6 @@
 import json
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -77,23 +77,28 @@ def test_a_run_is_submitted_and_archived_whole(tmp_path: Path) -> None:
     assert "sx q[0];" in run.circuit_qasm
 
 
+# Each case is a factory, called when the test runs: a timestamp built at collection would
+# go stale if the machine slept between collecting and running (0072).
 @pytest.mark.parametrize(
     ("changes", "message"),
     [
-        ({"prediction": prediction(datetime.now(UTC) + timedelta(hours=1))}, "before submission"),
-        ({"prediction": prediction(datetime(2026, 1, 1))}, "timezone"),
-        ({"circuit": Circuit(1).h(0).measure(0, 0)}, "h"),
-        ({"layout": (1, 2)}, "distinct qubits"),
-        ({"circuit": Circuit(2).measure_all(), "layout": (5, 5)}, "distinct qubits"),
-        ({"shots": 0}, "at least 1"),
+        (
+            lambda: {"prediction": prediction(datetime.now(UTC) + timedelta(hours=1))},
+            "before submission",
+        ),
+        (lambda: {"prediction": prediction(datetime(2026, 1, 1))}, "timezone"),
+        (lambda: {"circuit": Circuit(1).h(0).measure(0, 0)}, "h"),
+        (lambda: {"layout": (1, 2)}, "distinct qubits"),
+        (lambda: {"circuit": Circuit(2).measure_all(), "layout": (5, 5)}, "distinct qubits"),
+        (lambda: {"shots": 0}, "at least 1"),
     ],
 )
 def test_bad_submissions_are_refused_before_reaching_hardware(
-    tmp_path: Path, changes: dict[str, Any], message: str
+    tmp_path: Path, changes: Callable[[], dict[str, Any]], message: str
 ) -> None:
     transport = FakeTransport(("0",))
     with pytest.raises(ValueError, match=message):
-        go(transport, tmp_path, **changes)
+        go(transport, tmp_path, **changes())
     assert transport.submitted == []
     assert list(tmp_path.iterdir()) == []
 

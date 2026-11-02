@@ -48,6 +48,9 @@ ignore = ["PLR2004", "RUF002", "RUF003"]
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--strict-config", "-ra"]
 filterwarnings = ["error"]
+# No test takes more than a few seconds; one that runs this long has hung, and dumping
+# every thread's stack says where, instead of hanging CI silently (0072).
+faulthandler_timeout = 300
 
 [dependency-groups]
 dev = [
