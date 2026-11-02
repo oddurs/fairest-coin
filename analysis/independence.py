@@ -24,6 +24,7 @@ import sys
 import numpy as np
 import numpy.typing as npt
 
+from coin import extract
 from coin.archive import Run, load_run
 
 MAX_LAG = 100
@@ -96,13 +97,11 @@ def pair_correlation(xc: Floats, pairs: list[tuple[int, int]]) -> Floats:
 def von_neumann(x: Bits) -> tuple[Floats, Floats]:
     """Per column: the fraction of von Neumann output bits that are 1, and how many there are.
 
-    Shots are taken in non-overlapping pairs; 01 gives 0, 10 gives 1, 00 and 11 give nothing.
+    Uses the library's extractor, so this judges the code chapter 3 runs.
     """
-    first, second = x[0 : len(x) - 1 : 2], x[1 : len(x) : 2]
-    differ = first != second
-    count = differ.sum(axis=0).astype(np.float64)
-    ones = (first & differ).sum(axis=0)
-    return ones / count, count
+    outputs = [extract.von_neumann(x[:, c]) for c in range(x.shape[1])]
+    count = np.array([len(o) for o in outputs], dtype=np.float64)
+    return np.array([o.mean() for o in outputs]), count
 
 
 def coupling(run: Run) -> set[tuple[int, int]]:
@@ -118,10 +117,9 @@ def von_neumann_lag1(x: Bits) -> tuple[Floats, Floats]:
 
     Fair output is not enough for chapter 3: the output bits must not predict each other.
     """
-    first, second = x[0 : len(x) - 1 : 2], x[1 : len(x) : 2]
     r, m = [], []
     for c in range(x.shape[1]):
-        out = first[first[:, c] != second[:, c], c].astype(np.float64)
+        out = extract.von_neumann(x[:, c]).astype(np.float64)
         out -= out.mean()
         r.append(float(out[:-1] @ out[1:]) / float(out @ out))
         m.append(len(out))
