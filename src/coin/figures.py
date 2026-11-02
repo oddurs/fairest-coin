@@ -212,6 +212,10 @@ def chip_map(runs: Path) -> Figure:
         format=lambda x, _: f"{x:+.0%}",
     )
     colorbar.outline.set_visible(False)
+    # matplotlib rasterizes a long colour bar into an embedded PNG, whose zlib bytes differ
+    # between platforms; as vector paths it renders identically everywhere.
+    assert colorbar.solids is not None, "a ScalarMappable's colour bar is always drawn"
+    colorbar.solids.set_rasterized(False)
     colorbar.set_label(f"measured bias, fraction of tails {MINUS} 0.5: heads-heavy ← → tails-heavy")
     beyond = sorted((q for q in qubits if abs(bias[q]) > BIAS_CLIP), key=lambda q: -abs(bias[q]))
     ax.set_title(f"Every qubit of {run.backend} is a coin, and each one leans", loc="left")

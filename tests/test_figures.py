@@ -47,6 +47,12 @@ def test_svg_has_no_date_and_keeps_text_as_text(rendered: Path) -> None:
     assert "dbjsk29ffo6c73baaosg" in svg
 
 
+def test_no_figure_embeds_a_raster(rendered: Path) -> None:
+    # Embedded PNGs carry zlib output, which differs between platforms and breaks --check.
+    for path in rendered.iterdir():
+        assert "data:image/png" not in path.read_text(), path.name
+
+
 def test_first_coin_reports_the_archived_numbers(rendered: Path) -> None:
     svg = (rendered / "first-coin.svg").read_text()
     # 2071 of 4096 tails; the prediction's p_tails and sigma_tails / shots, to 4 places.
