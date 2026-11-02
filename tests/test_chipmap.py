@@ -9,7 +9,14 @@ import pytest
 
 from coin import cli
 from coin.archive import Prediction, Run, load_run
-from coin.chipmap import MAX_SHOTS, estimate_qpu_seconds, plan, summary, tails_by_qubit
+from coin.chipmap import (
+    MAX_SHOTS,
+    compare,
+    estimate_qpu_seconds,
+    plan,
+    summary,
+    tails_by_qubit,
+)
 from coin.circuit import Gate
 from coin.hardware import JobResult
 from coin.ibm import MissingCredentialsError
@@ -196,3 +203,47 @@ def test_more_shots_than_one_job_allows_is_a_usage_error(
     )
     assert code == 2
     assert "100,000" in err
+
+
+def chip_map_run(counts: dict[str, int], values: dict[str, Any]) -> Run:
+    now = datetime.now(UTC)
+    return Run(
+        job_id="j",
+        backend="b",
+        qubits=(5, 9),
+        shots=sum(counts.values()),
+        submitted_at=now,
+        finished_at=now,
+        circuit_qasm="",
+        counts=counts,
+        calibration={},
+        prediction=Prediction(now - timedelta(seconds=1), values),
+    )
+
+
+def test_compare_pairs_each_prediction_with_its_qubits_measurement() -> None:
+    # Qubit 5 (classical bit 0, rightmost) is tails in 300 of 400 shots, qubit 9 in 100.
+    run = chip_map_run(
+        {"01": 200, "11": 100, "00": 100},
+        {"p_tails": {"9": 0.2, "5": 0.75}, "p_tails_measurement_decay": {"5": 0.7}},
+    )
+    nine, five = sorted(compare(run), key=lambda r: -r.qubit)
+    assert (five.qubit, five.predicted, five.alternative) == (5, 0.75, 0.7)
+    assert five.measured == pytest.approx(0.75, abs=EXACT)
+    assert five.z == pytest.approx(0.0, abs=EXACT)
+    assert (nine.qubit, nine.alternative) == (9, None)
+    assert nine.measured == pytest.approx(0.25, abs=EXACT)
+    # σ is the prediction's own binomial spread: √(0.2 · 0.8 / 400) = 0.02, so 0.05 is 2.5σ.
+    assert nine.sigma == pytest.approx(0.02, abs=EXACT)
+    assert nine.z == pytest.approx(2.5, abs=EXACT)
+
+
+def test_compare_returns_qubits_in_numeric_order() -> None:
+    run = chip_map_run({"00": 1}, {"p_tails": {"9": 0.5, "5": 0.5}})
+    assert [r.qubit for r in compare(run)] == [5, 9]
+
+
+def test_compare_refuses_a_run_that_is_not_a_chip_map() -> None:
+    run = chip_map_run({"00": 1}, {"expected_tails": 2046.0})
+    with pytest.raises(ValueError, match="not a chip map"):
+        compare(run)
