@@ -1,10 +1,39 @@
 # Chapter 3: Make it fair
 
-Chapter 2 tried to predict how unfair each qubit's coin would be, and failed. A second
-look made things worse. Two chip maps, 4.7 hours apart, measured qubit biases that do not
-even correlate with each other (r = −0.05). Qubit 59 came up tails 79.8% of the time in the
-first and 49.8% in the second. The bias is not a property of the qubit waiting to be
-measured. It moves.
+Chapter 2 tried to predict how unfair each qubit's coin would be, and failed. A second chip
+map, 4.7 hours after the first, shows why prediction is the wrong goal:
+
+```pycon
+>>> import statistics
+>>> from coin.archive import load_run
+>>> from coin.chipmap import tails_by_qubit
+>>> first = load_run("data/runs/2026-11-02-dbjuh5d6p51s73cljo60")
+>>> second = load_run("data/runs/2026-11-02-dbk2l21kdqps7391l420")
+>>> a, b = tails_by_qubit(first), tails_by_qubit(second)
+>>> x = [a[q] / first.shots - 0.5 for q in range(156)]
+>>> y = [b[q] / second.shots - 0.5 for q in range(156)]
+>>> round(statistics.correlation(x, y, method="ranked"), 2)
+0.31
+>>> round(statistics.correlation(x, y), 2)
+-0.05
+>>> calm = [q for q in range(156) if abs(x[q]) < 0.05 and abs(y[q]) < 0.05]
+>>> len(calm), round(statistics.correlation([x[q] for q in calm], [y[q] for q in calm]), 2)
+(144, 0.24)
+```
+
+Part of each qubit's lean persists. Ranked by bias, the two maps agree moderately (+0.31),
+and so do the 144 qubits that stayed within 5% of fair in both (+0.24). But the large leans
+do not persist. Qubits that came up 65–80% tails in the first map were near fair in the
+second, and others took their place. The plain correlation, dominated by those few, is
+−0.05.
+
+Spike 0069 traced the largest of them to the measurement. For a while, qubit 59's readout
+read heads as tails three times in four. The calibration published afterwards recorded it;
+hours later the readout had recovered, and the coin came up 49.8% tails.
+
+So a qubit's bias is partly a property of the qubit and partly an event. Neither part can be
+corrected for, because neither is known in advance: chapter 2 showed the published
+calibration does not predict the first, and the excursions come and go within hours.
 
 So this chapter stops predicting the bias and removes it, without ever knowing what it is.
 
@@ -79,8 +108,9 @@ bits per flip, which is 0.21 here and never more than a quarter. Peres's iterati
 ## The assumption
 
 Read the argument again: *independently*, and *the same probability p*. Von Neumann's trick
-is exactly fair if, and only if, the flips do not influence each other and the bias holds
-still between the two flips of a pair.
+is guaranteed to be exactly fair when the flips do not influence each other and the bias
+holds still between the two flips of a pair. Without that, its output may still come out
+fair, as qubit 88 shows below, but nothing guarantees it.
 
 Spike 0028 tested that on the chip map's 100,000 shots of each of 156 qubits
 (`analysis/independence.py`):
@@ -113,11 +143,12 @@ one question a random sequence should answer unremarkably:
 - **serial:** every overlapping pattern of a few bits equally common?
 
 Each returns a p-value: how often a truly random sequence would look at least this unusual.
-By NIST's convention, below 0.01 is a failure.
+By NIST's convention, below 0.01 is a failure. The serial test returns two (one for pairs
+against single bits, one for triples against pairs), so the battery reports six p-values.
 
 On qubit 104's raw shots, monobit gives p = 2.1 × 10⁻¹³. The runs test reports 0, which
 means "not applied": the frequency is already too far off for it to be meaningful.
-Von Neumann's output passes all six.
+Von Neumann's output passes all six p-values.
 
 ## Hashing instead of pairing
 
@@ -157,7 +188,7 @@ qubit 104 the estimate was 0.884 bits per shot, and 0.442 was spent. The run's
 ```
 
 44,144 bits at ε = 2.3 × 10⁻¹⁰, which is 50.23% tails, well within the wobble of a fair
-coin. They pass all six tests; the smallest p-value is 0.21.
+coin. They pass all six p-values; the smallest is 0.21.
 
 These were the bits in this project's first entropy pool, and they are already spent:
 `coin flip` handed out exactly those 21,971 heads and 22,173 tails. That order matters. The
@@ -191,5 +222,5 @@ So, if no test of the output can prove randomness, what can?
 
 The answer turns out to need a second qubit, and a result that bothered Einstein. Two
 entangled coins can agree in a way that no pre-written list of outcomes could reproduce.
-Chapter 4 builds that pair. Chapter 5 uses it to certify randomness without trusting the
-device at all.
+Chapter 4 builds that pair. Chapter 5 uses it to certify randomness while trusting far less
+about the device, and lists the assumptions this experiment cannot remove.

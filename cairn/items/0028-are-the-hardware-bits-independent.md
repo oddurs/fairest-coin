@@ -9,7 +9,7 @@ assignee: Oddur Sigurdsson
 depends_on:
 - 23
 created: 2026-11-01
-updated: 2026-11-01
+updated: 2026-11-02
 closed_at: 2026-11-01
 priority: p0
 effort: s
@@ -60,7 +60,8 @@ neighbouring qubits, on archived runs that keep per-shot memory, with significan
   - 59: slow wander, plus lag 1 +4.6σ.
   
   Blocking at 5,000 shots removes slow drift but leaves 34, 88, 48 and 36 flagged, so their
-  structure is fast.
+  structure is fast; 59 also stays flagged there, by its lag-1 test (+4.1σ), though not by
+  Ljung-Box.
 - **Crosstalk:** none between coupled neighbours, except 113–119.
   - The other 175 coupled pairs: spread 1.013, none beyond 3σ (0.5 expected).
   - The 11,914 uncoupled pairs, as the control: spread 1.016, none past Bonferroni.
@@ -98,3 +99,7 @@ Correction to the note above: the 2.2 z spread is driven by a few qubits, not th
 ## Result
 
 151 of 156 chip-map qubits are independent to resolution |r|≈0.013 (lags 1–100) with no crosstalk; 5 have time structure (telegraph 34, periodic lines 88 and 36, short memory 48, wander 59). Von Neumann's output was fair on all 156 but serially correlated on qubit 88 (+9.8σ). Decision: von Neumann stays as chapter 3's teaching extractor, applied only to screened qubits; the entropy pool uses Toeplitz hashing from a min-entropy estimate (0070). Method: analysis/independence.py, checked by tests/test_independence.py.
+
+## 2026-11-02
+
+Correction (review of v0.1–v0.3): within 5,000-shot blocks qubit 59 is also flagged, by its lag-1 test (+4.1σ) though not by Ljung-Box; the answer said only 34, 88, 48 and 36. The whole-run lag-1 for 48 is +6.0σ; +5.8σ is its within-block value.

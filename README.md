@@ -15,7 +15,7 @@ This project builds a quantum coin from nothing, with its own simulator, noise m
 compiler, and runs it on real IBM quantum hardware, asking the same question more
 rigorously in each chapter. Each chapter predicts before it measures. The
 last one ends with a coin whose every flip carries a receipt: the job, the qubit, and the
-Bell-inequality violation that certifies it.
+Bell-inequality violation that backs it, with the assumptions it still rests on.
 
 ## Quickstart
 
@@ -44,15 +44,21 @@ heads   4,971   49.71%
 tails   5,029   50.29%
 ```
 
-`coin flip` runs on a simulator written from scratch in `src/coin/`, so its flips come
-from a seeded pseudo-random generator. [Chapter 1](docs/chapters/01-the-ideal-coin.md)
+`coin flip --sim` runs on a simulator written from scratch in `src/coin/`, so its flips
+come from a seeded pseudo-random generator. [Chapter 1](docs/chapters/01-the-ideal-coin.md)
 explains why that is not good enough.
 
-On real hardware, `coin run chip-map` predicts every qubit of an IBM backend from its
-calibration, then flips them all in one job (it needs an IBM Quantum account, and spends
-QPU time only with `--submit`). `coin compare` holds an archived run in `data/runs/`
-against its prediction. [Chapter 2](docs/chapters/02-predict-the-real-coin.md) is what
-happened the first time.
+On real hardware (an IBM Quantum account; QPU time is spent only with `--submit`):
+
+- `coin run chip-map` predicts every qubit of a backend from its calibration, then flips
+  them all in one job; `coin compare` holds the archived run against its prediction.
+  [Chapter 2](docs/chapters/02-predict-the-real-coin.md) is what happened.
+- `coin harvest` flips one qubit many times, archives the run, and extracts near-uniform
+  bits into a local pool. `coin flip` without `--sim` spends one, with a receipt naming the
+  run and the qubit it came from; `coin pool` shows what is left.
+  [Chapter 3](docs/chapters/03-make-it-fair.md) is why the bits need extracting.
+- `coin publish` adds a spent harvest's extraction record to its run, so every flip it gave
+  can be checked; `coin recover` archives a job whose run was cut short.
 
 ## The chapters
 
@@ -66,8 +72,8 @@ happened the first time.
 | 5. The proof | Can randomness be certified? | upcoming in v0.4 |
 | Epilogue | What would it really take? | upcoming in v1.0 |
 
-Every example, code excerpt and command in the chapters is run by the test suite, so the
-essay cannot drift from the code. The plan, milestone by milestone, is in
+Every Python example, code excerpt and `coin` command in the chapters is run by the test
+suite, so the essay cannot drift from the code. The plan, milestone by milestone, is in
 [ROADMAP.md](ROADMAP.md).
 
 ## Development
