@@ -25,7 +25,7 @@
 
 `coin predict` forecasts every qubit's coin bias from IBM's calibration data, and the
 
-### backlog
+### in progress
 
 - [ ] [`0027`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0027-cut-v0-2-0.md) Cut v0.2.0 <sup>chore · p0 · tooling</sup>
 

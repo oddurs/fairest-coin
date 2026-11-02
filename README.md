@@ -25,6 +25,14 @@ Requires [uv](https://docs.astral.sh/uv/).
 uv tool install git+https://github.com/oddurs/fairest-coin
 ```
 
+To run on IBM hardware too, install the `ibm` extra, which brings in Qiskit. Name the
+Python version: with an extra, uv resolves against its default interpreter, which may be
+older than the 3.13 this project needs.
+
+```sh
+uv tool install --python 3.13 "fairest-coin[ibm] @ git+https://github.com/oddurs/fairest-coin"
+```
+
 Flip the coin once, then ten thousand times. `--seed` makes a run replayable; leave it off
 for a fresh flip.
 
