@@ -11,9 +11,11 @@ from typing import Any
 
 import numpy as np
 
-from coin import __version__
+from coin import __version__, chipmap
 from coin.archive import ArchiveError, load_run
+from coin.chipmap import MAX_SHOTS
 from coin.circuit import Circuit
+from coin.hardware import Transport, submit
 from coin.noise import model_from_calibration, predict_tails
 from coin.sim import sample
 
@@ -72,6 +74,35 @@ def _parser() -> argparse.ArgumentParser:
         help="also apply decay over the readout window (the double-counting alternative)",
     )
     predict.set_defaults(handler=_predict)
+
+    run = commands.add_parser("run", help="run an experiment on real IBM hardware")
+    experiments = run.add_subparsers(dest="experiment", required=True, metavar="EXPERIMENT")
+    chip_map = experiments.add_parser(
+        "chip-map",
+        help="flip every qubit of a backend at once, predicted first",
+        description="Predict every qubit's coin from the backend's current calibration, then "
+        "flip them all in one job. Needs QISKIT_IBM_TOKEN and QISKIT_IBM_INSTANCE. "
+        "Spends QPU time only with --submit.",
+    )
+    chip_map.add_argument("--backend", required=True, metavar="NAME")
+    chip_map.add_argument(
+        "--shots",
+        type=_at_least(1),
+        required=True,
+        metavar="N",
+        help=f"shots per qubit, at most {MAX_SHOTS:,}",
+    )
+    mode = chip_map.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--dry-run", action="store_true", help="print the plan and its cost; submit nothing"
+    )
+    mode.add_argument(
+        "--submit", action="store_true", help="predict, then submit and archive the job"
+    )
+    chip_map.add_argument(
+        "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
+    )
+    chip_map.set_defaults(handler=_chip_map)
     return parser
 
 
@@ -131,3 +162,44 @@ def _read_calibration(path: Path) -> dict[str, Any]:
         return load_run(path).calibration
     raw = gzip.decompress(path.read_bytes()) if path.suffix == ".gz" else path.read_bytes()
     return json.loads(raw)
+
+
+def _transport() -> Transport:
+    # Imported here so that every other command works without the `ibm` extra.
+    from coin.ibm import IBMTransport  # noqa: PLC0415
+
+    return IBMTransport()
+
+
+def _chip_map(args: argparse.Namespace) -> int:
+    if args.shots > MAX_SHOTS:
+        print(f"coin run chip-map: at most {MAX_SHOTS:,} shots per job", file=sys.stderr)
+        return 2
+    try:
+        transport = _transport()
+        chip = chipmap.plan(args.backend, transport.calibration(args.backend), args.shots)
+        print(chipmap.summary(chip))
+        if args.dry_run:
+            print("dry run: nothing submitted")
+            return 0
+        command = f"coin run chip-map --backend {args.backend} --shots {args.shots} --submit"
+        directory = submit(transport, chip.submission, args.runs_dir, submit_script=command)
+    except ImportError as error:
+        print(f"coin run: install the ibm extra ({error})", file=sys.stderr)
+        return 1
+    except (ValueError, RuntimeError, ArchiveError) as error:
+        print(f"coin run chip-map: {error}", file=sys.stderr)
+        return 1
+    run = load_run(directory)
+    tails = chipmap.tails_by_qubit(run)
+    print(f"archived     {directory}")
+    for label, predicted in (
+        ("model", chip.p_tails),
+        ("alternative", chip.p_tails_measurement_decay),
+    ):
+        within = sum(
+            abs(tails[q] / run.shots - p) <= 3 * math.sqrt(p * (1 - p) / run.shots)
+            for q, p in predicted.items()
+        )
+        print(f"{label:12} {within} of {len(predicted)} qubits within 3σ of the prediction")  # noqa: RUF001 - σ is the display text
+    return 0

@@ -3,8 +3,10 @@ id: 23
 uid: af678808-0b5a-491f-b7c6-09b97f985bd5
 title: Flip every qubit on the chip in one job
 type: feature
-status: backlog
+status: doing
 milestone: v0.2
+assignee: Oddur Sigurdsson
+claimed: 2026-11-01
 depends_on:
 - 21
 - 22
@@ -28,7 +30,7 @@ write `prediction.json`, then submit H + measure on all qubits at once and archi
 
 ## Acceptance criteria
 
-- [ ] `--dry-run` prints the circuit, the predictions and the estimated QPU cost without submitting
+- [x] `--dry-run` prints the circuit, the predictions and the estimated QPU cost without submitting
 - [ ] At least one real run is archived under `data/runs/`
 - [ ] The run's predictions predate its submission, as shown by the timestamps in `meta.json`
 
@@ -43,3 +45,7 @@ From spike 0018: record two predictions per qubit, readout-only (the model) and 
 ## 2026-11-01
 
 From 0022: the executor Sampler has dry_run=True to estimate usage without QPU execution, but the adapter uses SamplerV2 (proven on hardware) for now. Estimate the chip-map cost from the backend's rep delay, readout and gate lengths times shots, and from spike 0015's 3 s per 4,096-shot job.
+
+## 2026-11-01
+
+Tooling built: coin run chip-map --backend NAME --shots N (--dry-run | --submit). Live dry run on ibm_marrakesh, 2026-11-01: 156 qubits, 100,000 shots (1σ ≈ 0.16%), 150 predicted (median bias −0.45%, range −4.18% to +14.25%), 83 resolvable beyond 3σ, 6 excluded with reasons, ~27 QPU seconds estimated. Criteria 2 and 3 wait for the owner-approved real run, which the owner submits.
