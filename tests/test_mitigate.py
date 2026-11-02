@@ -143,3 +143,10 @@ def test_readout_from_a_multi_bit_calibration_job() -> None:
     one = readout_from_counts(prepared_0, prepared_1, bit=1)
     assert (zero.p1_given_0, zero.p0_given_1) == pytest.approx((0.1, 0.2), abs=EXACT)
     assert (one.p1_given_0, one.p0_given_1) == pytest.approx((0.05, 0.0), abs=EXACT)
+
+
+def test_a_readout_worse_than_random_is_refused() -> None:
+    # p(1|0) + p(0|1) > 1: the contrast is negative. Inverting would flip the answer, and
+    # its size alone (0.2) must not let it through.
+    with pytest.raises(ValueError, match="contrast"):
+        mitigate({"0": 0.5, "1": 0.5}, {0: Readout(0.6, 0.6)})
