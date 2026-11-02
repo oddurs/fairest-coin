@@ -60,6 +60,9 @@
 - [ ] [`0034`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0034-draw-the-before-and-after-of-extraction.md) Draw the before-and-after of extraction <sup>feature · p2 · figures</sup>
 - [ ] [`0035`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0035-write-chapter-3-make-it-fair.md) Write chapter 3: make it fair <sup>docs · p0 · essay</sup>
 - [ ] [`0036`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0036-cut-v0-3-0.md) Cut v0.3.0 <sup>chore · p0 · tooling</sup>
+
+### in progress
+
 - [ ] [`0069`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0069-find-out-why-the-chip-map-prediction-missed.md) Find out why the chip-map prediction missed <sup>spike · p1 · noise</sup>
 
 ### done

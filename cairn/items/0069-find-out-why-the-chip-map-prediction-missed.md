@@ -3,12 +3,14 @@ id: 69
 uid: f0e32a13-8a2b-4825-9be5-e090faac8d93
 title: Find out why the chip-map prediction missed
 type: spike
-status: backlog
+status: doing
 milestone: v0.3
+assignee: Oddur Sigurdsson
+claimed: 2026-11-02
 depends_on:
 - 23
 created: 2026-11-01
-updated: 2026-11-01
+updated: 2026-11-02
 priority: p1
 effort: s
 area: noise
@@ -55,3 +57,7 @@ A later calibration (owner's dry run, 2026-11-02 ~02:53 UTC, not archived) newly
 ## 2026-11-01
 
 From spike 0028: coupled qubits 113 and 119, both excluded by the calibration model, are anticorrelated at −123σ (r ≈ −0.39) in the same shot. No other coupled pair shows crosstalk. Worth one line in the spike's readout circuits.
+
+## 2026-11-02
+
+Tooling built: coin run readout --backend --shots N --prepare {0,1} (--dry-run|--submit), predicted from each qubit's published readout straight from the snapshot (so qubits the model excludes, including the broken-readout ones, are tested too); readout.measured(run0, run1) gives per-qubit Readout as the jobs saw it. Deviation from the plan: three back-to-back jobs (prepare 0, prepare 1, a fresh chip map), not one job, because the adapter and the archive hold one circuit per job; drift between jobs is a caveat, drift within each job is still measurable. Proposed budget: 20,000 shots per readout job (~7 s each) and 100,000 for the chip map (~27 s).
