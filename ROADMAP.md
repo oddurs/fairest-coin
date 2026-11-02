@@ -27,10 +27,13 @@
 
 ### backlog
 
-- [ ] [`0023`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0023-flip-every-qubit-on-the-chip-in-one-job.md) Flip every qubit on the chip in one job <sup>feature · p0 · hardware</sup>
 - [ ] [`0025`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0025-draw-the-chip-map-and-the-prediction-scatter.md) Draw the chip map and the prediction scatter <sup>feature · p1 · figures</sup>
 - [ ] [`0026`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0026-write-chapter-2-predict-the-real-coin.md) Write chapter 2: predict the real coin <sup>docs · p0 · essay</sup>
 - [ ] [`0027`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0027-cut-v0-2-0.md) Cut v0.2.0 <sup>chore · p0 · tooling</sup>
+
+### in progress
+
+- [ ] [`0023`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0023-flip-every-qubit-on-the-chip-in-one-job.md) Flip every qubit on the chip in one job <sup>feature · p0 · hardware</sup>
 
 ### done
 
