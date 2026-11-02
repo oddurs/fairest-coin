@@ -20,11 +20,14 @@ Chapters 4 and 5.
 ## Done when
 
 - [ ] Two-qubit circuits are lowered to the backend's native gates by our own compiler
-- [ ] The predicted S is committed to git before the hardware run that measures it
-- [ ] Measured S exceeds 2 by at least 5 standard errors, or chapter 5 explains why not
-- [ ] The randomness accounting is explicit: seed bits in, certified bits out
+- [ ] The predicted S, with the interval it is judged against, is committed to git before the hardware run that measures it
+- [ ] A one-sided lower confidence bound on S, at a stated ε over the run's rounds, exceeds 2, or chapter 5 explains why not
+- [ ] The randomness accounting is explicit: setting bits in, certified bits out (hashed at the certified min-entropy), and the net, which is negative with uniform settings
 - [ ] Tagged `v0.4.0`
 
 ## Explicitly not in this milestone
 
 - Any claim of loophole-free certification
+- Randomness expansion: with fresh uniform settings every round the accounting is net negative
+  (0.27 certified bits per round at S = 2.5, for 2 setting bits in). Spot-checking protocols
+  that can come out positive are left for later.

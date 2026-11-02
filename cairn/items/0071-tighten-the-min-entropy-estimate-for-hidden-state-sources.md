@@ -33,9 +33,9 @@ Bound the likeliest sequence directly, not the average hit rate:
 - phase guessers fitted in sliding windows, so a drifting period stays in reach;
 - the remaining SP 800-90B predictors (MultiMCW, LZ78Y) and the compression estimate.
 
-Then lower SAFETY only as far as the evidence allows.
+Then raise SAFETY (spend more of the estimate) only as far as the evidence allows.
 
 ## Acceptance criteria
 
-- [ ] On the 0070 reviews' sources (scratch scripts me.py and me2.py, reproduced as tests), the estimate alone is at most the true value or its proven upper bound
+- [ ] On the sources the 0070 reviews built (short-dwell telegraph, drifting-period and chirped bias cycles, intermittent alternation; added as tests), the estimate alone is at most the true value or its proven upper bound
 - [ ] SAFETY is raised only by an amount every such test supports, and the change is recorded with the evidence

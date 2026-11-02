@@ -4,10 +4,10 @@ uid: 4e749089-507d-49f2-9848-3aa6b0f57b0c
 title: Move the IBM adapter to the client-side executor Sampler
 type: chore
 status: backlog
-milestone: later
+milestone: v0.4
 created: 2026-11-01
 updated: 2026-11-01
-priority: p2
+priority: p1
 effort: s
 area: hardware
 ---

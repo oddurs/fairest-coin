@@ -6,6 +6,7 @@ type: feature
 status: backlog
 milestone: v0.4
 depends_on:
+- 66
 - 22
 - 38
 created: 2026-11-01
