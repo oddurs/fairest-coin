@@ -1,0 +1,8 @@
+{
+  "model": "readout confusion + thermal relaxation and depolarizing per gate",
+  "p_tails": 0.4979529710589343,
+  "purpose": "harvest",
+  "qubit": 104,
+  "shots": 100000,
+  "written_at": "2026-11-02T06:16:22.097660+00:00"
+}

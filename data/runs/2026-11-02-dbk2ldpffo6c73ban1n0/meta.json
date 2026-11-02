@@ -1,0 +1,53 @@
+{
+  "backend": "ibm_marrakesh",
+  "executed_ops": {
+    "measure": 1,
+    "rz": 2,
+    "sx": 1
+  },
+  "finished_at": "2026-11-02T06:17:31.130627+00:00",
+  "job_id": "dbk2ldpffo6c73ban1n0",
+  "library_version": "0.2.0",
+  "options": {
+    "_VERSION": 2,
+    "default_shots": "Unset",
+    "dynamical_decoupling": {
+      "enable": false,
+      "extra_slack_distribution": "Unset",
+      "scheduling_method": "Unset",
+      "sequence_type": "Unset",
+      "skip_reset_qubits": "Unset"
+    },
+    "environment": {
+      "job_tags": null,
+      "log_level": "WARNING",
+      "private": false
+    },
+    "execution": {
+      "init_qubits": "Unset",
+      "meas_type": "Unset",
+      "rep_delay": "Unset"
+    },
+    "experimental": "Unset",
+    "max_execution_time": "Unset",
+    "simulator": {
+      "basis_gates": "Unset",
+      "coupling_map": "Unset",
+      "noise_model": "Unset",
+      "seed_simulator": "Unset"
+    },
+    "twirling": {
+      "enable_gates": false,
+      "enable_measure": false,
+      "num_randomizations": "Unset",
+      "shots_per_randomization": "Unset",
+      "strategy": "Unset"
+    }
+  },
+  "quantum_seconds": null,
+  "qubits": [
+    104
+  ],
+  "shots": 100000,
+  "submitted_at": "2026-11-02T06:16:23.069824+00:00"
+}
