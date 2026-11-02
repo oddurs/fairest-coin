@@ -12,8 +12,15 @@ compile suite's unexplained failure. A per-example wall-clock limit is itself a 
 
 import os
 
+import pytest
 from hypothesis import settings
 
 settings.register_profile("deterministic", derandomize=True, database=None, deadline=None)
 settings.register_profile("explore", derandomize=False, max_examples=1000, deadline=None)
 settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "deterministic"))
+
+
+@pytest.fixture(autouse=True)
+def private_pool(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test gets its own empty entropy pool; none can touch the user's."""
+    monkeypatch.setenv("COIN_POOL", str(tmp_path_factory.mktemp("pool")))
