@@ -29,7 +29,7 @@ One directory per job: `runs/<UTC date of submission>-<job id>/`, for example
 | `prediction-dryrun.json` | no | the forecast from a rehearsal that submitted nothing |
 | `submit.py` | no | the exact script that produced the run |
 | `usage.json` | no | IBM's usage record as it stood when the result arrived; may still say `pending` |
-| `extraction.json` | no | for a harvest, how its batch was extracted, added once the batch is spent |
+| `extraction.json` | no | for a harvest, how its batch was extracted; written by `coin publish` once the batch is spent |
 
 All JSON is UTF-8, indented by two spaces, keys sorted, with a trailing newline.
 New timestamps are ISO-8601 in UTC with microseconds, such as
@@ -103,8 +103,10 @@ from here instead, so those runs still report their QPU time.
 
 Only on harvest runs, and only once the harvest's pool batch is spent. The archived shots
 and the seed recorded here determine every bit of the batch. That lets anyone check the
-flips it gave, and, before they are spent, would let anyone predict them. So the run is
-committed with this file only after `coin pool` shows the batch empty.
+flips it gave, and, before they are spent, would let anyone predict them. So a harvest run
+is committed only once its batch is spent: `coin publish RUN` writes this file only after the
+pool shows the batch empty, then commit the run with it. `coin harvest --from-run` refuses a
+run that has the file, or that git already tracks.
 
 It holds the batch's provenance as the pool recorded it:
 - `batch`, `run`, `job_id`, `backend`, `qubit`, `shots`;

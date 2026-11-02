@@ -23,7 +23,7 @@ from typing import Any
 
 import numpy as np
 
-from coin.archive import Prediction, Run, load_run
+from coin.archive import EXTRACTION, Prediction, Run, add_record, load_run
 from coin.circuit import Circuit
 from coin.extract import (
     SAFETY,
@@ -158,8 +158,22 @@ class HarvestError(RuntimeError):
 
 
 def extract_run(run_dir: Path, pool: Pool) -> Harvest:
-    """Extract an archived one-qubit run's shots and add them to the pool as a batch."""
+    """Extract an archived harvest run's shots and add them to the pool as a batch.
+
+    Only a harvest's own run qualifies, and only before it is published: once its shots and
+    seed are public, every bit extracted from them is predictable. A fresh seed would hide
+    that, and the bits would then owe their randomness to the seed, not the qubit the
+    receipt names. Publication is recognised by the extraction record (and, in the CLI, by
+    git tracking the run); a copy of public shots made elsewhere cannot be recognised.
+    """
     run = load_run(run_dir)
+    if run.prediction is None:
+        raise ValueError(f"{run_dir} has no prediction, so it is not a harvest run")
+    purpose = run.prediction.values.get("purpose")
+    if purpose != "harvest":
+        raise ValueError(f"{run_dir} is not a harvest run (its prediction is for {purpose!r})")
+    if (run_dir / EXTRACTION).exists():
+        raise ValueError(f"{run_dir} is already published; its bits are no longer secret")
     x = shots_of(run)
     seed = seed_bits(2 * len(x))
     extraction = toeplitz_extract(x, seed)
@@ -178,3 +192,34 @@ def extract_run(run_dir: Path, pool: Pool) -> Harvest:
     }
     batch = pool.add(extraction.bits, provenance, label=run.job_id)
     return Harvest(run_dir, batch, extraction)
+
+
+def publish(run_dir: Path, pool: Pool) -> Path:
+    """Write a harvest run's extraction record next to it, once its batch is spent.
+
+    The record (the batch's provenance, its seed included) lets anyone recompute every bit
+    the batch gave, which is what makes a receipt checkable, and also what would make any
+    unspent bit predictable. So it is written only after `coin pool` shows the batch empty.
+    """
+    run = load_run(run_dir)
+    if (run_dir / EXTRACTION).exists():
+        raise ValueError(f"{run_dir} is already published")
+    batches = [b for b in pool.status() if b.provenance.get("job_id") == run.job_id]
+    if not batches:
+        raise ValueError(f"no batch in the pool came from job {run.job_id}")
+    if len(batches) > 1:
+        # Possible in pools filled before 0078, when a copied run could be pooled again.
+        names = ", ".join(b.batch for b in batches)
+        raise ValueError(f"job {run.job_id} was pooled more than once ({names}); publish by hand")
+    (batch,) = batches
+    if batch.provenance.get("run") != run_dir.name:
+        raise ValueError(
+            f"batch {batch.batch} came from run {batch.provenance.get('run')}, not {run_dir.name}"
+        )
+    if batch.remaining:
+        raise ValueError(
+            f"batch {batch.batch} still has {batch.remaining:,} unspent bits; publishing now "
+            "would make them predictable"
+        )
+    record = {**batch.provenance, "batch": batch.batch, "spent_before_publishing": True}
+    return add_record(run_dir, EXTRACTION, record)

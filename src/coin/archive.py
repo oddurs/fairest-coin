@@ -26,10 +26,14 @@ PREDICTION = "prediction.json"
 PREDICTION_DRYRUN = "prediction-dryrun.json"
 SUBMIT = "submit.py"
 USAGE = "usage.json"
+# A harvest's extraction record, added by `coin publish` once its pool batch is spent.
+EXTRACTION = "extraction.json"
 
 # prediction.json is required unless meta.json records why the run went without one.
 REQUIRED = (META, CIRCUIT, COUNTS, CALIBRATION, PREDICTION)
 OPTIONAL = (MEMORY, PREDICTION_DRYRUN, SUBMIT, USAGE)
+# Records added to a run after it was archived, by `add_record`; never part of the run itself.
+RECORDS = (EXTRACTION,)
 
 # meta.json keys the typed fields of `Run` own; every other key is kept in `Run.extra`.
 _META_KEYS = frozenset(
@@ -380,3 +384,21 @@ def _dump_json(data: object) -> bytes:
 
 def _write_json(path: Path, data: object) -> None:
     path.write_bytes(_dump_json(data))
+
+
+def add_record(run_dir: Path | str, name: str, data: object) -> Path:
+    """Add a record written after the run, such as `extraction.json`, to an archived run.
+
+    The run's own files are never touched; a record that already exists is refused. Written
+    to a temporary file and renamed into place, so it is either whole or absent.
+    """
+    root = Path(run_dir)
+    if name not in RECORDS:
+        raise ArchiveError(f"{name} is not a record that can be added after a run")
+    target = root / name
+    if target.exists():
+        raise ArchiveError(f"{target} already exists")
+    temporary = root / f".{name}.tmp"
+    temporary.write_bytes(_dump_json(data))
+    temporary.replace(target)
+    return target

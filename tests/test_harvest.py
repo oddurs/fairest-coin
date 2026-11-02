@@ -1,5 +1,8 @@
+import json
 import os
+import shutil
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -357,3 +360,88 @@ def test_an_unreadable_archived_run_still_gets_the_recovery_message(
         harvest.harvest(
             FakeTransport(calibration), chosen, tmp_path / "runs", Pool(tmp_path / "p"), "x"
         )
+
+
+def test_a_copied_run_directory_is_still_one_job(
+    calibration: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    chosen = harvest.plan("b", calibration, SHOTS)
+    run_dir = harvest.submit(FakeTransport(calibration), chosen.submission, tmp_path / "runs")
+    copy = tmp_path / "elsewhere" / "copy-run"
+    shutil.copytree(run_dir, copy)
+    assert cli_run(["harvest", "--from-run", str(run_dir)], capsys)[0] == 0
+    code, _, err = cli_run(["harvest", "--from-run", str(copy)], capsys)
+    assert code == 1
+    assert "already pooled" in err
+
+
+@pytest.mark.parametrize(
+    "run", ["2026-11-02-dbjuh5d6p51s73cljo60", "2026-11-01-dbjsk29ffo6c73baaosg"]
+)
+def test_only_a_harvest_run_can_be_pooled(run: str, tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="not a harvest run"):
+        harvest.extract_run(ROOT / "data" / "runs" / run, Pool(tmp_path))
+
+
+def test_a_published_harvest_cannot_be_pooled_again(tmp_path: Path) -> None:
+    # Chapter 3's harvest: its shots and seed are in git, so its bits are anyone's to compute.
+    published = ROOT / "data/runs/2026-11-02-dbk2ldpffo6c73ban1n0"
+    with pytest.raises(ValueError, match="already published"):
+        harvest.extract_run(published, Pool(tmp_path))
+
+
+def test_publish_waits_for_the_batch_to_be_spent_then_lets_anyone_recompute_it(
+    calibration: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    chosen = harvest.plan("b", calibration, SHOTS)
+    pool = Pool(tmp_path / "pool")
+    result = harvest.harvest(FakeTransport(calibration), chosen, tmp_path / "runs", pool, "x")
+    code, _, err = cli_run(["publish", str(result.run_dir), "--pool", str(pool.path)], capsys)
+    assert code == 1
+    assert "unspent" in err
+    assert not (result.run_dir / "extraction.json").exists()
+
+    (draw,) = pool.take(len(result.extraction.bits))
+    code, _, err = cli_run(["publish", str(result.run_dir), "--pool", str(pool.path)], capsys)
+    assert code == 0, err
+    record = json.loads((result.run_dir / "extraction.json").read_text())
+    seed = np.unpackbits(np.frombuffer(bytes.fromhex(record["seed"]), dtype=np.uint8))
+    shots = harvest.shots_of(load_run(result.run_dir))
+    assert np.array_equal(toeplitz(shots, seed[: record["seed_bits"]], record["bits"]), draw.bits)
+    assert record["spent_before_publishing"] is True
+
+    code, _, err = cli_run(["publish", str(result.run_dir), "--pool", str(pool.path)], capsys)
+    assert code == 1
+    assert "already published" in err
+
+
+def test_publish_refuses_a_copy_of_the_run(calibration: dict[str, Any], tmp_path: Path) -> None:
+    chosen = harvest.plan("b", calibration, SHOTS)
+    pool = Pool(tmp_path / "pool")
+    result = harvest.harvest(FakeTransport(calibration), chosen, tmp_path / "runs", pool, "x")
+    pool.take(len(result.extraction.bits))
+    copy = tmp_path / "copy-of-run"
+    shutil.copytree(result.run_dir, copy)
+    with pytest.raises(ValueError, match="came from run"):
+        harvest.publish(copy, pool)
+    assert not (copy / "extraction.json").exists()
+
+
+def test_a_run_tracked_by_git_is_not_pooled(capsys: pytest.CaptureFixture[str]) -> None:
+    # The first chip map is committed; any committed run's shots are public.
+    code, _, err = cli_run(
+        ["harvest", "--from-run", str(ROOT / "data/runs/2026-11-02-dbjuh5d6p51s73cljo60")], capsys
+    )
+    assert code == 1
+    assert "tracked by git" in err
+
+
+def test_a_run_with_no_prediction_is_named_as_such(
+    calibration: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    chosen = harvest.plan("b", calibration, SHOTS)
+    run_dir = harvest.submit(FakeTransport(calibration), chosen.submission, tmp_path / "runs")
+    real = harvest.load_run
+    monkeypatch.setattr(harvest, "load_run", lambda d: replace(real(d), prediction=None))
+    with pytest.raises(ValueError, match="has no prediction"):
+        harvest.extract_run(run_dir, Pool(tmp_path / "p"))
