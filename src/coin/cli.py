@@ -75,6 +75,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     predict.set_defaults(handler=_predict)
 
+    compare = commands.add_parser(
+        "compare",
+        help="compare an archived chip map with its prediction",
+        description="Read an archived chip-map run and report how its measurements compare "
+        "with the prediction written before it ran. Reads only the archive.",
+    )
+    compare.add_argument("run_dir", type=Path, metavar="RUN", help="an archived run directory")
+    compare.set_defaults(handler=_compare)
+
     run = commands.add_parser("run", help="run an experiment on real IBM hardware")
     experiments = run.add_subparsers(dest="experiment", required=True, metavar="EXPERIMENT")
     chip_map = experiments.add_parser(
@@ -122,7 +131,8 @@ def _at_least(minimum: int) -> Callable[[str], int]:
 def _flip(args: argparse.Namespace) -> int:
     if not args.sim:
         print(
-            "coin flip: real hardware arrives in v0.2; pass --sim to flip on the simulator",
+            "coin flip: single hardware flips arrive in v0.3; pass --sim to flip on the "
+            "simulator, or use `coin run chip-map` to flip every qubit of a backend",
             file=sys.stderr,
         )
         return 2
@@ -162,6 +172,15 @@ def _read_calibration(path: Path) -> dict[str, Any]:
         return load_run(path).calibration
     raw = gzip.decompress(path.read_bytes()) if path.suffix == ".gz" else path.read_bytes()
     return json.loads(raw)
+
+
+def _compare(args: argparse.Namespace) -> int:
+    try:
+        print(chipmap.report(load_run(args.run_dir)))
+    except (OSError, ValueError, ArchiveError) as error:
+        print(f"coin compare: {error}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def _transport() -> Transport:

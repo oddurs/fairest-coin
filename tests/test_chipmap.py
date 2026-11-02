@@ -1,5 +1,7 @@
 import json
+import re
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -11,9 +13,11 @@ from coin import cli
 from coin.archive import Prediction, Run, load_run
 from coin.chipmap import (
     MAX_SHOTS,
+    _drift,
     compare,
     estimate_qpu_seconds,
     plan,
+    report,
     summary,
     tails_by_qubit,
 )
@@ -247,3 +251,85 @@ def test_compare_refuses_a_run_that_is_not_a_chip_map() -> None:
     run = chip_map_run({"00": 1}, {"expected_tails": 2046.0})
     with pytest.raises(ValueError, match="not a chip map"):
         compare(run)
+
+
+def test_compare_refuses_a_single_qubit_run_whose_p_tails_is_one_number() -> None:
+    with pytest.raises(ValueError, match="not a chip map"):
+        compare(load_run(FIRST_RUN))
+
+
+CHIP_MAP_RUN = ROOT / "data/runs/2026-11-02-dbjuh5d6p51s73cljo60"
+
+
+def memory_run(tails: np.ndarray) -> Run:
+    """A run whose per-shot memory is `tails` (shots × qubits, True for tails)."""
+    shots, width = tails.shape
+    # Qubit 0 is the rightmost character of each outcome.
+    memory = tuple("".join("1" if bit else "0" for bit in row[::-1]) for row in tails)
+    return replace(chip_map_run({}, {}), qubits=tuple(range(width)), shots=shots, memory=memory)
+
+
+def test_drift_is_standard_normal_for_coins_that_hold_still() -> None:
+    # 200 independent fair coins: the spread of 200 standard normals is 1 ± 0.05, so ±0.2
+    # is a 4σ band; beyond 3σ about 0.5 are expected and 4 would be rare. The seed fixes it.
+    z = _drift(memory_run(np.random.default_rng(7).random((2000, 200)) < 0.5))
+    assert sorted(z) == list(range(200))
+    assert 0.8 < np.std(list(z.values()), ddof=1) < 1.2
+    assert sum(abs(v) > 3 for v in z.values()) <= 3
+
+
+def test_drift_finds_the_coins_that_change_halfway_by_physical_qubit() -> None:
+    # A fifth of the coins move from 50% to 60% tails halfway, which is about 4.5σ each.
+    rng = np.random.default_rng(7)
+    p = np.full((2000, 200), 0.5)
+    p[1000:, :40] = 0.6
+    z = _drift(memory_run(rng.random((2000, 200)) < p))
+    assert sum(abs(z[q]) > 3 for q in range(40)) >= 30
+    assert sum(abs(z[q]) > 3 for q in range(40, 200)) <= 3
+
+
+def test_the_report_quotes_the_archived_chip_map() -> None:
+    text = report(load_run(CHIP_MAP_RUN))
+    assert "written 2.3 s before submission; 150 qubits predicted, 6 excluded" in text
+    assert re.search(r"within 3σ\s+31\s+16", text)  # noqa: RUF001 - σ is the display text
+    assert re.search(r"median bias, measured\s+\+0\.45%", text)
+    assert "131 of 150 within 3σ if each sx error may be coherent" in text  # noqa: RUF001
+    assert "8 of 156 qubits changed by more than 3σ" in text  # noqa: RUF001
+    assert "(0.4 expected if they held still)" in text
+    misses = text.split("largest misses")[1].splitlines()[1:]
+    assert [line.split()[0] for line in misses] == ["59", "29", "48", "34", "118"]
+
+
+def test_the_report_leaves_out_drift_without_per_shot_memory() -> None:
+    run = load_run(CHIP_MAP_RUN)
+    text = report(replace(run, memory=None))
+    assert "drift" not in text
+    assert "largest misses" in text
+
+
+def test_compare_command_refuses_a_run_that_is_not_a_chip_map(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    code, out, err = run_cli(["compare", str(FIRST_RUN)], capsys)
+    assert (code, out) == (1, "")
+    assert "not a chip map" in err
+
+
+def test_compare_command_reports_a_missing_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, _, err = run_cli(["compare", str(tmp_path / "nope")], capsys)
+    assert code == 1
+    assert err.startswith("coin compare: ")
+
+
+def test_the_report_names_predicted_qubits_without_usable_calibration() -> None:
+    run = load_run(CHIP_MAP_RUN)
+    assert run.prediction is not None
+    values = run.prediction.values
+    # Qubit 82 has no T2 in this calibration, so nothing could have predicted it.
+    forged = Prediction(
+        run.prediction.written_at, {**values, "p_tails": {**values["p_tails"], "82": 0.5}}
+    )
+    with pytest.raises(ValueError, match=r"predicted qubits \[82\] have no usable calibration"):
+        report(replace(run, prediction=forged))

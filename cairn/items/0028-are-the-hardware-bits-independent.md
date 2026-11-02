@@ -42,3 +42,7 @@ neighbouring qubits, on archived runs that keep per-shot memory, with significan
 ## 2026-11-01
 
 The chip-map run keeps per-shot memory for all 156 qubits (data/runs/2026-11-02-dbjuh5d6p51s73cljo60). A first look already shows drift: splitting the 100,000 shots in halves gives a per-qubit z spread of 2.2 where 1.0 is expected, and q29 falls from 68.8% to 65.9% tails across the job.
+
+## 2026-11-01
+
+Correction to the note above: the 2.2 z spread is driven by a few qubits, not the chip. Per qubit (chipmap._drift, halves of the run): 8 of 156 change by more than 3σ where 0.4 are expected; q34 +20.1σ, q89 +10.2σ, q29 −8.0σ, q59 +5.9σ. A robust (MAD) spread is about 1.09. So most qubits look stationary over 25 s, and the extractor question is per qubit.

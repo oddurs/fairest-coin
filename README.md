@@ -12,8 +12,8 @@ mechanics is the one place where randomness can come with a proof, and the proof
 entanglement.
 
 This project builds a quantum coin from nothing, with its own simulator, noise model and
-compiler, and is working towards running it on real IBM quantum hardware, asking the same
-question more rigorously in each chapter. Each chapter predicts before it measures. The
+compiler, and runs it on real IBM quantum hardware, asking the same question more
+rigorously in each chapter. Each chapter predicts before it measures. The
 last one ends with a coin whose every flip carries a receipt: the job, the qubit, and the
 Bell-inequality violation that certifies it.
 
@@ -36,9 +36,15 @@ heads   4,971   49.71%
 tails   5,029   50.29%
 ```
 
-Today the coin runs on a statevector simulator written from scratch in `src/coin/`, so
-its flips come from a seeded pseudo-random generator. [Chapter 1](docs/chapters/01-the-ideal-coin.md)
-explains why that is not good enough. Real hardware arrives in v0.2.
+`coin flip` runs on a simulator written from scratch in `src/coin/`, so its flips come
+from a seeded pseudo-random generator. [Chapter 1](docs/chapters/01-the-ideal-coin.md)
+explains why that is not good enough.
+
+On real hardware, `coin run chip-map` predicts every qubit of an IBM backend from its
+calibration, then flips them all in one job (it needs an IBM Quantum account, and spends
+QPU time only with `--submit`). `coin compare` holds an archived run in `data/runs/`
+against its prediction. [Chapter 2](docs/chapters/02-predict-the-real-coin.md) is what
+happened the first time.
 
 ## The chapters
 
@@ -46,7 +52,7 @@ explains why that is not good enough. Real hardware arrives in v0.2.
 |---|---|---|
 | [0. Your coin is unfair](docs/chapters/00-your-coin-is-unfair.md) | Why does this question matter? | written |
 | [1. The ideal coin](docs/chapters/01-the-ideal-coin.md) | What is a quantum coin? | written |
-| 2. Predict the real coin | How does real hardware bend it? | upcoming in v0.2 |
+| [2. Predict the real coin](docs/chapters/02-predict-the-real-coin.md) | How does real hardware bend it? | written |
 | 3. Make it fair | Can a biased coin be fixed? | upcoming in v0.3 |
 | 4. Two coins that agree | What is entanglement for? | upcoming in v0.4 |
 | 5. The proof | Can randomness be certified? | upcoming in v0.4 |

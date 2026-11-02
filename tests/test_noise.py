@@ -6,10 +6,12 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from coin.circuit import Circuit, Gate, Measure
+from coin.gates import matrix
 from coin.noise import (
     Readout,
     amplitude_damping,
     apply_readout,
+    coherent_bias_bound,
     depolarizing,
     phase_damping,
     thermal_relaxation,
@@ -126,3 +128,54 @@ def test_readout_rejects_bits_the_outcome_lacks() -> None:
 def test_readout_rejects_non_probabilities(p10: float, p01: float) -> None:
     with pytest.raises(ValueError, match="probability"):
         Readout(p10, p01)
+
+
+def coin_with_error(error: Gate) -> Circuit:
+    """The native coin with an unwanted rotation straight after its one physical gate."""
+    return Circuit(1, (Gate("rz", (0,), (math.pi / 2,)), Gate("sx", (0,)), error)).measure(0, 0)
+
+
+def infidelity(u: np.ndarray) -> float:
+    """Average gate infidelity of a one-qubit unitary error, (2/3)·(1 − |Tr U / 2|²).
+
+    Computed without cancellation: as V = U/√det U = [[a, −b*], [b, a*]], the bracket is
+    Im(a)² + |b|². Subtracting from 1 would lose everything below 1e-16 to rounding.
+    """
+    v = u / np.sqrt(np.linalg.det(u))
+    return 2 / 3 * (v[0, 0].imag ** 2 + abs(v[1, 0]) ** 2)
+
+
+angle = st.floats(min_value=-math.pi / 2, max_value=math.pi / 2, allow_nan=False)
+
+
+@given(angle)
+def test_an_over_rotation_reaches_the_coherent_bound_exactly(epsilon: float) -> None:
+    error = Gate("rx", (0,), (epsilon,))
+    bias = probabilities(coin_with_error(error)).get("1", 0.0) - 0.5
+    assert abs(bias) == pytest.approx(coherent_bias_bound(infidelity(matrix(error))), abs=EXACT)
+
+
+@given(angle, angle, angle)
+def test_no_unitary_error_of_that_size_biases_the_coin_further(
+    a: float, b: float, c: float
+) -> None:
+    rotation = Circuit(1).rz(a, 0).ry(b, 0).rz(c, 0)
+    u = np.eye(2, dtype=complex)
+    for gate in rotation.ops:
+        assert isinstance(gate, Gate)
+        u = matrix(gate) @ u
+    coin = Circuit(1, (Gate("rz", (0,), (math.pi / 2,)), Gate("sx", (0,)), *rotation.ops))
+    bias = probabilities(coin.measure(0, 0)).get("1", 0.0) - 0.5
+    assert abs(bias) <= coherent_bias_bound(min(infidelity(u), 2 / 3)) + EXACT
+
+
+def test_the_bound_for_a_typical_heron_sx() -> None:
+    # gate_error 2.5e-4 permits ε = 2·asin(√3.75e-4) ≈ 0.0387 rad: a bias of sin(ε)/2 ≈ ±1.94%.
+    assert coherent_bias_bound(2.5e-4) == pytest.approx(0.0193613, abs=1e-7)
+    assert coherent_bias_bound(0.0) == 0.0
+
+
+@pytest.mark.parametrize("bad", [-1e-9, 0.67])
+def test_the_bound_refuses_an_impossible_gate_error(bad: float) -> None:
+    with pytest.raises(ValueError, match="2/3"):
+        coherent_bias_bound(bad)
