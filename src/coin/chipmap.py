@@ -100,6 +100,46 @@ def tails_by_qubit(run: Run) -> dict[int, int]:
     return {run.qubits[clbit]: tails[clbit] for clbit in range(width)}
 
 
+@dataclass(frozen=True)
+class QubitResult:
+    """One qubit of an archived chip map: what was predicted, and what it did."""
+
+    qubit: int
+    predicted: float
+    alternative: float | None  # None where the calibration had no readout length
+    measured: float
+    shots: int
+
+    @property
+    def sigma(self) -> float:
+        """The spread of the measured fraction if the prediction were exactly right."""
+        return math.sqrt(self.predicted * (1 - self.predicted) / self.shots)
+
+    @property
+    def z(self) -> float:
+        """How many σ the measurement landed from the prediction."""
+        return (self.measured - self.predicted) / self.sigma
+
+
+def compare(run: Run) -> list[QubitResult]:
+    """Every predicted qubit of an archived chip map against what it measured, by qubit."""
+    if run.prediction is None or "p_tails" not in run.prediction.values:
+        raise ValueError(f"job {run.job_id}: not a chip map; its prediction has no p_tails")
+    values = run.prediction.values
+    alternative = values.get("p_tails_measurement_decay", {})
+    tails = tails_by_qubit(run)
+    return [
+        QubitResult(
+            qubit=int(q),
+            predicted=p,
+            alternative=alternative.get(q),
+            measured=tails[int(q)] / run.shots,
+            shots=run.shots,
+        )
+        for q, p in sorted(values["p_tails"].items(), key=lambda item: int(item[0]))
+    ]
+
+
 def summary(chip: ChipMap) -> str:
     """The plan in words: what runs, what is predicted, what it costs."""
     shots = chip.submission.shots

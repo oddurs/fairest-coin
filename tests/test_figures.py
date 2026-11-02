@@ -1,3 +1,4 @@
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -5,6 +6,8 @@ from pathlib import Path
 import pytest
 
 from coin import figures
+from coin.archive import load_run
+from coin.chipmap import compare
 
 ROOT = Path(__file__).parent.parent
 RUNS = ROOT / "data" / "runs"
@@ -106,3 +109,42 @@ def test_importing_coin_does_not_load_matplotlib() -> None:
         "assert 'matplotlib' not in sys.modules, 'matplotlib was imported'\n"
     )
     subprocess.run([sys.executable, "-c", code], check=True)
+
+
+CHIP_MAP = load_run(RUNS / figures.CHIP_MAP_RUN)
+
+
+def test_the_chip_layout_puts_every_coupled_pair_one_unit_apart() -> None:
+    edges = figures._coupling(CHIP_MAP.calibration)
+    position = figures.heavy_hex_layout(edges)
+    assert sorted(position) == list(range(156))
+    assert len(set(position.values())) == 156, "two qubits drawn in one place"
+    for a, b in edges:
+        (xa, ya), (xb, yb) = position[a], position[b]
+        assert math.hypot(xa - xb, ya - yb) == pytest.approx(1.0, abs=1e-12), (a, b)
+
+
+def test_the_layout_refuses_a_graph_that_is_not_heavy_hex() -> None:
+    # A bridge qubit (9) joining two qubits of the same row.
+    with pytest.raises(ValueError, match="bridge qubit 9"):
+        figures.heavy_hex_layout({(0, 1), (1, 2), (0, 9), (2, 9)})
+
+
+def test_the_chip_map_names_qubits_beyond_its_colour_scale(rendered: Path) -> None:
+    svg = (rendered / "chip-map.svg").read_text()
+    # q59: 79,792 of 100,000 tails in the archived run.
+    assert "59 (+29.8%)" in svg
+    assert "119 (-11.4%)" in svg
+    assert "dbjuh5d6p51s73cljo60" in svg
+
+
+def test_the_scatter_counts_and_labels_what_compare_finds(rendered: Path) -> None:
+    svg = (rendered / "prediction-scatter.svg").read_text()
+    results = compare(CHIP_MAP)
+    within = sum(abs(r.z) <= 3 for r in results)
+    assert within == 31
+    assert f"{within} of {len(results)} qubits" in svg
+    named = {r.qubit for r in results if abs(r.measured - r.predicted) > figures.NAMED_RESIDUAL}
+    assert {59, 118} <= named
+    for q in named:
+        assert f">{q}</text>" in svg, q
