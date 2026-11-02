@@ -6,6 +6,46 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-02
+
+Hardening: every defect a review of the first three milestones found, fixed with the test
+that would have caught it, and a v0.4 plan rebuilt on what the hardware showed.
+
+### Added
+
+- `coin recover [JOB_ID] [--record FILE] [--force]` archives a submitted job whose
+  process died or whose archive failed, from the pending record `submit` now writes
+  before it submits. `coin recover --discard FILE` removes a record that never reached
+  IBM. A job is never archived twice or under the wrong id.
+- `coin publish RUN` writes a spent harvest's extraction record into its archived run.
+- `coin harvest` forecasts its yield from simulated coins at the predicted bias and
+  refuses a run that would give fewer than 1,000 bits, before it submits.
+- `noise.average_infidelity` and `noise.gate_depolarizing`.
+
+### Changed
+
+- The essay and README say what the data now shows: chapter 3 opens on rank and robust
+  statistics, chapter 2 tells what spike 0069 found, and nothing promises loophole-free
+  certification.
+- The v0.4 plan claims no randomness expansion, bounds S with Hoeffding at a stated ε,
+  hashes certified bits at the certified rate, and names what it still assumes.
+- Commit subjects are capped at 64 characters, so the squash merge stays within 72.
+
+### Fixed
+
+- A job submitted to IBM could be lost, with its shots and prediction, if the process
+  died or archiving failed after submission. QPU seconds now come from IBM's charge.
+- The IBM adapter scrubbed the token only verbatim; percent- and form-encoded copies now
+  go too. Its circuit-change check now compares classical bits.
+- `min_entropy` could score a short repeated block as random. Each guesser is now scored
+  only on at least 100 of its own guesses.
+- The pool could take one job twice, or a run that was not a harvest or was already
+  published.
+- `coin compare` failed on a chip map whose calibration had no readout length.
+- The noise model counted gate relaxation twice (an effect on the coin under 1.3e-5).
+- Four places where a mutant of the code survived the tests.
+- The pre-push hook misread whether runs were tracked when git set `GIT_DIR`.
+
 ## [0.3.0] - 2026-11-02
 
 The fair coin: real hardware flips, made fair without knowing their bias, spent one at a
@@ -95,7 +135,8 @@ The ideal coin: a quantum coin built from scratch, flipped on a simulator.
 - A test suite that runs every example, code excerpt and command quoted in the chapters
   and the README.
 
-[Unreleased]: https://github.com/oddurs/fairest-coin/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/oddurs/fairest-coin/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/oddurs/fairest-coin/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/oddurs/fairest-coin/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/oddurs/fairest-coin/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/oddurs/fairest-coin/releases/tag/v0.1.0
