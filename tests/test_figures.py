@@ -3,6 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from coin import figures
@@ -154,3 +155,19 @@ def test_the_scatter_counts_and_labels_what_compare_finds(rendered: Path) -> Non
     assert {59, 118} <= named
     for q in named:
         assert f">{q}</text>" in svg, q
+
+
+def test_the_extraction_figure_draws_and_labels_the_threshold(rendered: Path) -> None:
+    svg = (rendered / "extraction.svg").read_text()
+    assert "fails ← \N{GREEK SMALL LETTER ALPHA} = 0.01" in svg
+    # Two qubits, three series each, with their bit counts from the archived chip map.
+    assert "von Neumann (25,503 bits)" in svg
+    assert "raw shots (100,000 bits)" in svg
+    assert "qubit 88" in svg
+    assert "qubit 34" in svg
+
+
+def test_battery_points_are_rounded_and_floored() -> None:
+    points = figures._battery_points(np.zeros(1000, dtype=np.uint8))
+    assert all(v == round(v, 2) for v in points.values())
+    assert min(points.values()) >= math.log10(figures.P_FLOOR)

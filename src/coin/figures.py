@@ -17,12 +17,16 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+import numpy as np
+import numpy.typing as npt
 from matplotlib.colors import LinearSegmentedColormap, Normalize
 from matplotlib.figure import Figure
 from matplotlib.typing import RcKeyType
 
 from coin.archive import load_run
+from coin.battery import ALPHA, battery
 from coin.chipmap import compare, tails_by_qubit
+from coin.extract import toeplitz_extract, von_neumann
 
 # Relative to the repository root, where scripts/figures runs from.
 RUNS = Path("data/runs")
@@ -45,6 +49,7 @@ BIAS = LinearSegmentedColormap.from_list("bias", [MEASURED, INK, PREDICTED])
 BIAS_CLIP = 0.05
 SIGMA = "\N{GREEK SMALL LETTER SIGMA}"
 MINUS = "\N{MINUS SIGN}"
+ALPHA_SIGN = "\N{GREEK SMALL LETTER ALPHA}"
 # Beyond this the residual is named on the scatter, not just marked.
 NAMED_RESIDUAL = 0.05
 
@@ -318,12 +323,91 @@ def prediction_scatter(runs: Path) -> Figure:
     return fig
 
 
+# The extraction figure's p-value axis stops here; anything smaller is drawn at the floor.
+P_FLOOR = 1e-30
+# Qubits from spike 0028: 88 carries a periodic disturbance, 34 switches like a telegraph.
+EXTRACTION_QUBITS = (88, 34)
+
+
+def _battery_points(bits: npt.NDArray[np.uint8]) -> dict[str, float]:
+    """The battery's p-values, as log₁₀ rounded to two places: the last digits of erfc and
+    lgamma differ between platforms, and the figure must render to the same bytes on each."""
+    return {name: round(math.log10(max(p, P_FLOOR)), 2) for name, p in battery(bits).items()}
+
+
+def extraction(runs: Path) -> Figure:
+    """The battery on raw shots, von Neumann's output and Toeplitz's, for two misbehaving qubits."""
+    run = load_run(runs / CHIP_MAP_RUN)
+    if run.memory is None:
+        raise ValueError(f"{runs / CHIP_MAP_RUN}: the chip map is expected to keep its memory")
+    width = len(run.memory[0])
+    shots = np.frombuffer("".join(run.memory).encode(), dtype=np.uint8).reshape(-1, width)
+    # A fixed seed so the figure renders the same every time; harvests use the OS's.
+    seed = np.random.default_rng(0).integers(0, 2, 2 * len(shots), dtype=np.uint8)
+
+    fig = Figure(figsize=(8.4, 5.2))
+    axes = fig.subplots(1, len(EXTRACTION_QUBITS), sharey=True)
+    for ax, qubit in zip(axes, EXTRACTION_QUBITS, strict=True):
+        column = width - 1 - run.qubits.index(qubit)  # classical bit 0 is rightmost
+        raw = (shots[:, column] == ord("1")).astype(np.uint8)
+        series = (
+            ("raw shots", raw, INK, "x"),
+            ("von Neumann", von_neumann(raw), MEASURED, "o"),
+            ("Toeplitz", toeplitz_extract(raw, seed).bits, PREDICTED, "s"),
+        )
+        names: list[str] = []
+        for offset, (label, bits, colour, marker) in zip((-0.22, 0, 0.22), series, strict=True):
+            points = _battery_points(bits)
+            names = list(points)
+            ys = [i + offset for i in range(len(names))]
+            ax.scatter(
+                list(points.values()),
+                ys,
+                color=colour,
+                marker=marker,
+                s=28,
+                label=f"{label} ({len(bits):,} bits)",
+                zorder=2,
+            )
+        threshold = math.log10(ALPHA)
+        ax.axvline(threshold, color=INK, lw=1, ls="--", zorder=1)
+        ax.annotate(
+            f"fails ← {ALPHA_SIGN} = {ALPHA}",
+            (threshold, 1),
+            xycoords=("data", "axes fraction"),
+            xytext=(-4, 2),
+            textcoords="offset points",
+            ha="right",
+            va="bottom",
+            fontsize=8,
+        )
+        floor = math.log10(P_FLOOR)
+        ax.set_xlim(floor - 1, 0.5)
+        ax.set_xticks([floor, -20, -10, 0], [f"≤10^{int(floor)}", "10^-20", "10^-10", "1"])
+        ax.set_yticks(range(len(names)), names)
+        ax.invert_yaxis()
+        ax.set_title(f"qubit {qubit}", loc="left", fontsize=10)
+        ax.set_xlabel("p-value (log scale)")
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), fontsize=7, frameon=False)
+    fig.suptitle("The test battery before and after extraction", x=0.01, ha="left", color=INK)
+    fig.text(
+        0.01,
+        0.02,
+        f"{run.shots:,} shots per qubit · {run.backend} · job {run.job_id} · "
+        "Toeplitz seed fixed for the figure",
+        fontsize=8,
+    )
+    fig.subplots_adjust(left=0.24, right=0.98, top=0.86, bottom=0.33, wspace=0.12)
+    return fig
+
+
 # To add a figure: write a function from the runs directory to a Figure, and name its file
 # here. `scripts/figures` renders it; commit the SVG it writes.
 FIGURES: dict[str, Callable[[Path], Figure]] = {
     "first-coin.svg": first_coin,
     "chip-map.svg": chip_map,
     "prediction-scatter.svg": prediction_scatter,
+    "extraction.svg": extraction,
 }
 
 
