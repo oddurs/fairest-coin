@@ -190,6 +190,24 @@ def report(run: Run) -> str:
     def pct(x: float) -> str:
         return f"{x:+.2%}"
 
+    def correlation(xs: list[float], ys: list[float]) -> str:
+        # Undefined for fewer than two values or for values that never vary.
+        try:
+            return f"{statistics.correlation(xs, ys):+.2f}"
+        except statistics.StatisticsError:
+            return "—"
+
+    # A calibration without readout lengths gives no alternative prediction; the run is still
+    # worth reporting against the model.
+    if both:
+        alt_within = str(within_3_sigma(alternative_p, both))
+        alt_median = pct(statistics.median(p - 0.5 for p in alternative_p))
+        alt_correlation = correlation(alternative_p, [r.measured - 0.5 for r in both])
+        alt_closer = str(len(both) - closer)
+        closer_text = str(closer)
+    else:
+        alt_within = alt_median = alt_correlation = alt_closer = closer_text = "—"
+
     rows = [
         f"run          {run.backend}, job {run.job_id}, "
         f"{len(run.qubits)} qubits × {run.shots:,} shots",  # noqa: RUF001 - × is the display text
@@ -197,17 +215,17 @@ def report(run: Run) -> str:
         f"{len(results)} qubits predicted, {len(values.get('excluded', {}))} excluded",
         f"{'':29}{'model':>7}{'alternative':>14}",
         f"{'within 3σ':29}{within_3_sigma(model_p, results):>7}"  # noqa: RUF001 - σ is the display text
-        f"{within_3_sigma(alternative_p, both):>14}",
+        f"{alt_within:>14}",
         f"{'median bias, predicted':29}{pct(statistics.median(p - 0.5 for p in model_p)):>7}"
-        f"{pct(statistics.median(p - 0.5 for p in alternative_p)):>14}",
+        f"{alt_median:>14}",
         f"{'median bias, measured':29}{pct(statistics.median(measured)):>7}",
-        f"{'correlation with measured':29}"
-        f"{statistics.correlation(model_p, measured):>+7.2f}"
-        f"{statistics.correlation(alternative_p, [r.measured - 0.5 for r in both]):>+14.2f}",
-        f"{'closer to the measurement':29}{closer:>7}{len(both) - closer:>14}",
+        f"{'correlation with measured':29}{correlation(model_p, measured):>7}{alt_correlation:>14}",
+        f"{'closer to the measurement':29}{closer_text:>7}{alt_closer:>14}",
         f"coherent     {explained} of {len(results)} within 3σ if each sx error may be "  # noqa: RUF001 - σ is the display text
         f"coherent (median bound ±{statistics.median(bounds.values()):.2%})",
     ]
+    if not both:
+        rows.append("alternative  not predicted: the calibration gave no readout lengths")
     if run.memory is not None:
         z = _drift(run)
         moved = sum(abs(v) > 3 for v in z.values())

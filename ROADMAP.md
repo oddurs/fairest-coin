@@ -21,7 +21,7 @@
 
 ## v0.3.1 — Hardening
 
-`#·········` 9% · 1 of 11 done · due 2026-11-09
+`##········` 18% · 2 of 11 done · due 2026-11-09
 
 v0.3.1: every defect found by the review of the first three milestones is fixed, the essay
 
@@ -30,7 +30,6 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 - [ ] [`0075`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0075-never-lose-a-submitted-job-s-shots-prediction-or-calibration.md) Never lose a submitted job's shots, prediction or calibration <sup>bug · p0 · hardware</sup>
 - [ ] [`0076`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0076-scrub-encoded-credentials-and-check-classical-bits-in-the-ibm-adapter.md) Scrub encoded credentials and check classical bits in the IBM adapter <sup>bug · p2 · hardware</sup>
 - [ ] [`0078`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0078-pool-each-job-once-only-harvest-runs-and-publish-the-extraction-record.md) Pool each job once, only harvest runs, and publish the extraction record <sup>bug · p1 · extract</sup>
-- [ ] [`0079`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0079-report-a-chip-map-whose-calibration-had-no-readout-length.md) Report a chip map whose calibration had no readout length <sup>bug · p2 · hardware</sup>
 - [ ] [`0080`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0080-stop-counting-gate-relaxation-twice-in-the-noise-model.md) Stop counting gate relaxation twice in the noise model <sup>bug · p3 · noise</sup>
 - [ ] [`0081`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0081-close-the-four-test-gaps-the-review-s-mutants-found.md) Close the four test gaps the review's mutants found <sup>chore · p2 · tooling</sup>
 - [ ] [`0082`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0082-bring-the-essay-up-to-date-with-what-v0-3-found.md) Bring the essay up to date with what v0.3 found <sup>docs · p1 · essay</sup>
@@ -41,6 +40,7 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 ### done
 
 - [x] [`0077`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0077-estimate-min-entropy-honestly-on-short-inputs-and-pre-flight-harvests-by-it.md) Estimate min-entropy honestly on short inputs, and pre-flight harvests by it <sup>bug · p0 · extract</sup>
+- [x] [`0079`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0079-report-a-chip-map-whose-calibration-had-no-readout-length.md) Report a chip map whose calibration had no readout length <sup>bug · p2 · hardware</sup>
 
 ## v0.2 — The real coin
 

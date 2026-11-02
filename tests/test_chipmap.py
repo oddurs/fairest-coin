@@ -333,3 +333,27 @@ def test_the_report_names_predicted_qubits_without_usable_calibration() -> None:
     )
     with pytest.raises(ValueError, match=r"predicted qubits \[82\] have no usable calibration"):
         report(replace(run, prediction=forged))
+
+
+def test_a_chip_map_without_alternative_predictions_is_still_reported() -> None:
+    # A calibration with no readout lengths: plan() leaves the alternative empty, and the
+    # report used to crash on an empty median.
+    run = load_run(CHIP_MAP_RUN)
+    assert run.prediction is not None
+    values = {**run.prediction.values, "p_tails_measurement_decay": {}}
+    text = report(replace(run, prediction=Prediction(run.prediction.written_at, values)))
+    assert "alternative  not predicted" in text
+    assert re.search(r"within 3σ\s+31\s+—", text)  # noqa: RUF001 - σ is the display text
+
+
+def test_a_one_qubit_chip_map_is_reported() -> None:
+    run = load_run(CHIP_MAP_RUN)
+    assert run.prediction is not None
+    values = run.prediction.values
+    one = {
+        **values,
+        "p_tails": {"10": values["p_tails"]["10"]},
+        "p_tails_measurement_decay": {"10": values["p_tails_measurement_decay"]["10"]},
+    }
+    text = report(replace(run, prediction=Prediction(run.prediction.written_at, one)))
+    assert re.search(r"correlation with measured\s+—\s+—", text)
