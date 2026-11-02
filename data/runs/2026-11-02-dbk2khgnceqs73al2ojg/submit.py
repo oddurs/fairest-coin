@@ -1,0 +1,1 @@
+coin run readout --backend ibm_marrakesh --shots 20000 --prepare 1 --submit --runs-dir data/runs
