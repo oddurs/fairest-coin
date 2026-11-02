@@ -136,9 +136,12 @@ def load_run(path: Path | str) -> Run:
     else:
         prediction = None
 
-    counts = _read_counts(root / COUNTS, shots)
-    memory_path = root / MEMORY
-    memory = _read_memory(memory_path, counts, shots) if memory_path.exists() else None
+    counts_path = _locate(root, COUNTS)
+    if counts_path is None:
+        raise ArchiveError(f"{root / COUNTS}: required file is missing")
+    counts = _read_counts(counts_path, shots)
+    memory_path = _locate(root, MEMORY)
+    memory = None if memory_path is None else _read_memory(memory_path, counts, shots)
 
     return Run(
         job_id=need("job_id", str),
@@ -196,7 +199,8 @@ def write_run(runs_dir: Path | str, run: Run, *, allow_no_prediction: bool = Fal
     try:
         _write_json(staging / META, meta)
         (staging / CIRCUIT).write_text(run.circuit_qasm)
-        _write_json(staging / COUNTS, run.counts)
+        # Whole-chip runs have ~100,000 distinct 156-bit outcomes: gzip keeps them committable.
+        _write_gzip(staging / f"{COUNTS}.gz", _dump_json(run.counts))
         # mtime=0 keeps the bytes a function of the calibration alone, so git sees no churn.
         (staging / CALIBRATION).write_bytes(gzip.compress(_dump_json(run.calibration), mtime=0))
         if run.prediction is not None:
@@ -204,7 +208,7 @@ def write_run(runs_dir: Path | str, run: Run, *, allow_no_prediction: bool = Fal
         if run.prediction_dryrun is not None:
             _write_json(staging / PREDICTION_DRYRUN, _prediction_json(run.prediction_dryrun))
         if run.memory is not None:
-            (staging / MEMORY).write_text("".join(run.memory) + "\n")
+            _write_gzip(staging / f"{MEMORY}.gz", ("".join(run.memory) + "\n").encode())
         if run.usage is not None:
             _write_json(staging / USAGE, run.usage)
         if run.submit_script is not None:
@@ -270,11 +274,27 @@ def _parse_time(path: Path, text: str) -> datetime:
 
 def _read_text(path: Path) -> str:
     try:
-        return path.read_text()
+        raw = path.read_bytes()
+        return (gzip.decompress(raw) if path.suffix == ".gz" else raw).decode()
     except FileNotFoundError as err:
         raise ArchiveError(f"{path}: required file is missing") from err
-    except (OSError, UnicodeDecodeError) as err:
+    except (OSError, EOFError, UnicodeDecodeError) as err:
         raise ArchiveError(f"{path}: cannot read: {err}") from err
+
+
+def _locate(root: Path, name: str) -> Path | None:
+    """`name` or `name.gz` in `root`, whichever exists; both at once is ambiguous."""
+    plain, packed = root / name, root / f"{name}.gz"
+    if plain.exists() and packed.exists():
+        raise ArchiveError(f"{plain} and {packed} both exist; a run keeps one form of each file")
+    return packed if packed.exists() else plain if plain.exists() else None
+
+
+def _write_gzip(path: Path, data: bytes) -> None:
+    # mtime=0 keeps the bytes a function of the data alone, so git sees no churn. Level 6, not
+    # the default 9: on random bit strings level 9's match search takes 88 s for 16 MB against
+    # 2.7 s at level 6, for a file only 6% smaller.
+    path.write_bytes(gzip.compress(data, compresslevel=6, mtime=0))
 
 
 def _parse_json(path: Path, text: str) -> Any:

@@ -21,7 +21,7 @@
 
 ## v0.2 — The real coin
 
-`########··` 79% · 15 of 19 done · due 2026-11-22
+`########··` 80% · 16 of 20 done · due 2026-11-22
 
 `coin predict` forecasts every qubit's coin bias from IBM's calibration data, and the
 
@@ -49,6 +49,7 @@
 - [x] [`0064`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0064-check-every-command-a-chapter-or-the-readme-quotes.md) Check every command a chapter or the README quotes <sup>bug · p1 · essay</sup>
 - [x] [`0065`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0065-dispatch-cli-subcommands-explicitly.md) Dispatch CLI subcommands explicitly <sup>chore · p1 · cli</sup>
 - [x] [`0067`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0067-make-the-property-tests-deterministic.md) Make the property tests deterministic <sup>chore · p1 · tooling</sup>
+- [x] [`0068`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0068-gzip-counts-and-memory-so-whole-chip-runs-fit-in-git.md) Gzip counts and memory so whole-chip runs fit in git <sup>feature · p0 · hardware</sup>
 
 ## v0.3 — The fair coin
 
