@@ -21,7 +21,7 @@
 
 ## v0.2 — The real coin
 
-`########··` 74% · 14 of 19 done · due 2026-11-22
+`########··` 79% · 15 of 19 done · due 2026-11-22
 
 `coin predict` forecasts every qubit's coin bias from IBM's calibration data, and the
 
@@ -31,7 +31,6 @@
 - [ ] [`0025`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0025-draw-the-chip-map-and-the-prediction-scatter.md) Draw the chip map and the prediction scatter <sup>feature · p1 · figures</sup>
 - [ ] [`0026`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0026-write-chapter-2-predict-the-real-coin.md) Write chapter 2: predict the real coin <sup>docs · p0 · essay</sup>
 - [ ] [`0027`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0027-cut-v0-2-0.md) Cut v0.2.0 <sup>chore · p0 · tooling</sup>
-- [ ] [`0067`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0067-make-the-property-tests-deterministic.md) Make the property tests deterministic <sup>chore · p1 · tooling</sup>
 
 ### done
 
@@ -49,6 +48,7 @@
 - [x] [`0063`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0063-hold-the-simulator-tests-to-the-project-s-float-rules.md) Hold the simulator tests to the project's float rules <sup>bug · p1 · sim</sup>
 - [x] [`0064`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0064-check-every-command-a-chapter-or-the-readme-quotes.md) Check every command a chapter or the README quotes <sup>bug · p1 · essay</sup>
 - [x] [`0065`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0065-dispatch-cli-subcommands-explicitly.md) Dispatch CLI subcommands explicitly <sup>chore · p1 · cli</sup>
+- [x] [`0067`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0067-make-the-property-tests-deterministic.md) Make the property tests deterministic <sup>chore · p1 · tooling</sup>
 
 ## v0.3 — The fair coin
 
