@@ -21,13 +21,9 @@
 
 ## v0.2 — The real coin
 
-`##########` 95% · 19 of 20 done · due 2026-11-22
+`##########` 100% · 20 of 20 done · due 2026-11-22
 
 `coin predict` forecasts every qubit's coin bias from IBM's calibration data, and the
-
-### in progress
-
-- [ ] [`0027`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0027-cut-v0-2-0.md) Cut v0.2.0 <sup>chore · p0 · tooling</sup>
 
 ### done
 
@@ -43,6 +39,7 @@
 - [x] [`0024`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0024-regenerate-figures-deterministically-from-the-archive.md) Regenerate figures deterministically from the archive <sup>feature · p1 · figures</sup>
 - [x] [`0025`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0025-draw-the-chip-map-and-the-prediction-scatter.md) Draw the chip map and the prediction scatter <sup>feature · p1 · figures</sup>
 - [x] [`0026`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0026-write-chapter-2-predict-the-real-coin.md) Write chapter 2: predict the real coin <sup>docs · p0 · essay</sup>
+- [x] [`0027`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0027-cut-v0-2-0.md) Cut v0.2.0 <sup>chore · p0 · tooling</sup>
 - [x] [`0061`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0061-reject-non-finite-angles-and-non-integer-indices-in-the-ir.md) Reject non-finite angles and non-integer indices in the IR <sup>bug · p1 · sim</sup>
 - [x] [`0062`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0062-apply-the-negligible-cutoff-per-outcome-and-only-build-occurring-outcomes.md) Apply the negligible cutoff per outcome, and only build occurring outcomes <sup>bug · p1 · sim</sup>
 - [x] [`0063`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0063-hold-the-simulator-tests-to-the-project-s-float-rules.md) Hold the simulator tests to the project's float rules <sup>bug · p1 · sim</sup>
