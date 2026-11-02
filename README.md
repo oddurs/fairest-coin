@@ -61,7 +61,7 @@ happened the first time.
 | [0. Your coin is unfair](docs/chapters/00-your-coin-is-unfair.md) | Why does this question matter? | written |
 | [1. The ideal coin](docs/chapters/01-the-ideal-coin.md) | What is a quantum coin? | written |
 | [2. Predict the real coin](docs/chapters/02-predict-the-real-coin.md) | How does real hardware bend it? | written |
-| 3. Make it fair | Can a biased coin be fixed? | upcoming in v0.3 |
+| [3. Make it fair](docs/chapters/03-make-it-fair.md) | Can a biased coin be fixed? | written |
 | 4. Two coins that agree | What is entanglement for? | upcoming in v0.4 |
 | 5. The proof | Can randomness be certified? | upcoming in v0.4 |
 | Epilogue | What would it really take? | upcoming in v1.0 |

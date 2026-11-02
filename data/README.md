@@ -29,6 +29,7 @@ One directory per job: `runs/<UTC date of submission>-<job id>/`, for example
 | `prediction-dryrun.json` | no | the forecast from a rehearsal that submitted nothing |
 | `submit.py` | no | the exact script that produced the run |
 | `usage.json` | no | the final QPU usage, fetched after the job finished |
+| `extraction.json` | no | for a harvest, how its batch was extracted, added once the batch is spent |
 
 All JSON is UTF-8, indented by two spaces, keys sorted, with a trailing newline.
 New timestamps are ISO-8601 in UTC with microseconds, such as
@@ -96,3 +97,20 @@ The final usage record, fetched once IBM marks it complete. `Run.qpu_seconds` ta
 `qpu_charge_time_seconds` from here when present, and falls back to `meta.json`'s
 `quantum_seconds`. The first run shows why: at result time its usage still read
 `pending` and `quantum_seconds` was null.
+
+### `extraction.json`
+
+Only on harvest runs, and only once the harvest's pool batch is spent. The archived shots
+and the seed recorded here determine every bit of the batch. That lets anyone check the
+flips it gave, and, before they are spent, would let anyone predict them. So the run is
+committed with this file only after `coin pool` shows the batch empty.
+
+It holds the batch's provenance as the pool recorded it:
+- `batch`, `run`, `job_id`, `backend`, `qubit`, `shots`;
+- `entropy_per_bit` (the min-entropy per shot spent) and `estimate` (the estimate it was
+  half of);
+- `epsilon`, `input_bits` and `bits` (the batch's length);
+- `seed` (hex, packed bits) and `seed_bits`;
+- `added_at`, and `spent_before_publishing`.
+
+`coin.extract.toeplitz` of the run's shots with that seed reproduces the batch bit for bit.
