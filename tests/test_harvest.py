@@ -287,3 +287,14 @@ def test_pool_with_sim_is_a_usage_error(tmp_path: Path, capsys: pytest.CaptureFi
     code, _, err = cli_run(["flip", "--sim", "--pool", str(tmp_path)], capsys)
     assert code == 2
     assert "--sim" in err
+
+
+def test_the_pool_table_lines_up(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    pool = Pool(tmp_path)
+    pool.add([1] * 40_000, {"qubit": 104}, label="dbk2ldpffo6c73ban1n0")
+    pool.add([0] * 5, {"qubit": 7}, label="x")
+    code, out, _ = cli_run(["pool", "--pool", str(tmp_path)], capsys)
+    lines = out.splitlines()
+    assert code == 0
+    # The last column is right-aligned, so aligned columns mean equal-length lines.
+    assert len({len(line) for line in lines}) == 1, lines
