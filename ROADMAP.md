@@ -50,7 +50,7 @@
 
 ## v0.3 — The fair coin
 
-`####······` 36% · 4 of 11 done · due 2026-12-06
+`#####·····` 45% · 5 of 11 done · due 2026-12-06
 
 `coin harvest` collects real hardware bits, debiases them, and fills a local pool;
 
