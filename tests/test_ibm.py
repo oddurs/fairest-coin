@@ -1,6 +1,6 @@
 import subprocess
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -173,4 +173,152 @@ def test_a_failure_after_submission_names_the_job(
         transport.run("fake", NATIVE_COIN_QASM, [0], 10)
     message = str(caught.value)
     assert "job-after-qpu-7" in message
+    assert TOKEN not in message
+
+
+class Bits:
+    def __init__(self, memory: list[str]) -> None:
+        self._memory = memory
+
+    def get_bitstrings(self) -> list[str]:
+        return self._memory
+
+
+class Pub:
+    def __init__(self, memory: list[str]) -> None:
+        self.data = type("Data", (), {"c": Bits(memory)})()
+
+
+class DoneJob:
+    """A finished job whose usage call may fail, as an HTTP blip would make it."""
+
+    def __init__(self, metrics: Any) -> None:
+        self._metrics = metrics
+
+    def job_id(self) -> str:
+        return "job-done-1"
+
+    def result(self) -> Any:
+        return [Pub(["0", "1", "1"])]
+
+    def metrics(self) -> Any:
+        if isinstance(self._metrics, BaseException):
+            raise self._metrics
+        return self._metrics
+
+
+class Sampler:
+    options = sampler_options = None
+
+    def __init__(self, job: Any) -> None:
+        self._job = job
+
+    def run(self, _pubs: Any, shots: int) -> Any:
+        return self._job
+
+
+def with_job(monkeypatch: pytest.MonkeyPatch, job: Any) -> IBMTransport:
+    monkeypatch.setattr("coin.ibm.sampler_for", lambda _backend: Sampler(job))
+    monkeypatch.setattr("coin.ibm._plain", lambda _options: {})
+    return IBMTransport(lambda _t, _i: FakeService(heron_like(2)))
+
+
+def test_a_usage_failure_keeps_the_shots(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    transport = with_job(monkeypatch, DoneJob(ConnectionError(f"blip {TOKEN}")))
+    result = transport.run("fake", NATIVE_COIN_QASM, [0], 3)
+    assert result.memory == ("0", "1", "1")
+    assert (result.usage, result.quantum_seconds) == (None, None)
+
+
+def test_qpu_seconds_come_from_the_usage_records_charge(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The shape IBM returns: the charge is qpu_charge_time_seconds, even while pending.
+    usage = {"qpu_charge_time_seconds": 8, "status": "pending", "unit": "resource_units"}
+    transport = with_job(monkeypatch, DoneJob({"usage": usage}))
+    result = transport.run("fake", NATIVE_COIN_QASM, [0], 3)
+    assert result.quantum_seconds == pytest.approx(8.0)
+    assert result.usage == usage
+
+
+def test_an_interruption_while_waiting_carries_the_job_id(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Interrupted(DoneJob):
+        def result(self) -> Any:
+            raise KeyboardInterrupt
+
+    transport = with_job(monkeypatch, Interrupted({}))
+    with pytest.raises(KeyboardInterrupt) as caught:
+        transport.run("fake", NATIVE_COIN_QASM, [0], 3)
+    assert getattr(caught.value, "job_id", None) == "job-done-1"
+
+
+def test_a_failure_after_submission_carries_the_job_id(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("coin.ibm.sampler_for", lambda _backend: FailingSampler())
+    monkeypatch.setattr("coin.ibm._plain", lambda _options: {})
+    transport = IBMTransport(lambda _t, _i: FakeService(heron_like(2)))
+    with pytest.raises(IBMError) as caught:
+        transport.run("fake", NATIVE_COIN_QASM, [0], 10)
+    assert caught.value.job_id == "job-after-qpu-7"
+    assert "coin recover job-after-qpu-7" in str(caught.value)
+
+
+def test_a_finished_job_is_fetched_by_id(credentials: None) -> None:
+    class Service(FakeService):
+        def job(self, job_id: str) -> Any:
+            assert job_id == "job-done-1"
+            return DoneJob({"usage": {"qpu_charge_time_seconds": 5}})
+
+    transport = IBMTransport(lambda _t, _i: Service(heron_like(2)))
+    submitted = datetime.now(UTC)
+    result = transport.fetch("fake", "job-done-1", submitted)
+    assert (result.job_id, result.memory, result.submitted_at) == (
+        "job-done-1",
+        ("0", "1", "1"),
+        submitted,
+    )
+    assert result.quantum_seconds == pytest.approx(5.0)
+
+
+def test_the_adapter_reports_the_job_the_moment_it_exists(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[tuple[str, dict[str, Any]]] = []
+    transport = with_job(monkeypatch, DoneJob({}))
+    transport.run(
+        "fake", NATIVE_COIN_QASM, [0], 3, lambda job, details: seen.append((job, details))
+    )
+    ((job, details),) = seen
+    assert job == "job-done-1"
+    assert details["executed_ops"] == {"rz": 2, "sx": 1, "measure": 1}
+    assert "submitted_at" in details
+
+
+def test_bookkeeping_that_fails_does_not_abandon_the_job(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(_job: str, _details: dict[str, Any]) -> None:
+        raise OSError("disk full")
+
+    transport = with_job(monkeypatch, DoneJob({}))
+    result = transport.run("fake", NATIVE_COIN_QASM, [0], 3, broken)
+    assert result.memory == ("0", "1", "1")
+
+
+def test_a_failure_while_fetching_is_not_sent_back_to_recover(credentials: None) -> None:
+    class Service(FakeService):
+        def job(self, job_id: str) -> Any:
+            raise LookupError(f"no such job {TOKEN}")
+
+    transport = IBMTransport(lambda _t, _i: Service(heron_like(2)))
+    with pytest.raises(IBMError) as caught:
+        transport.fetch("fake", "gone-1", datetime.now(UTC))
+    message = str(caught.value)
+    assert message.startswith("fetching job gone-1")
+    assert "coin recover" not in message
     assert TOKEN not in message

@@ -16,7 +16,7 @@ from coin import __version__, chipmap, harvest, readout
 from coin.archive import ArchiveError, load_run
 from coin.chipmap import MAX_SHOTS
 from coin.circuit import Circuit
-from coin.hardware import Transport, submit
+from coin.hardware import Fetcher, Transport, discard, pending_runs, recover, submit
 from coin.noise import model_from_calibration, predict_tails
 from coin.pool import POOL_ENV, EmptyPoolError, Pool, receipt
 from coin.sim import sample
@@ -108,6 +108,39 @@ def _parser() -> argparse.ArgumentParser:
     )
     compare.add_argument("run_dir", type=Path, metavar="RUN", help="an archived run directory")
     compare.set_defaults(handler=_compare)
+
+    recover = commands.add_parser(
+        "recover",
+        help="archive a hardware job whose run was cut short",
+        description="Archive a job that IBM accepted but whose run did not finish archiving "
+        "(the wait timed out, the connection dropped, or it was interrupted), from the pending "
+        "record written before it was submitted. Fetches the result from IBM if the record "
+        "does not already hold it; needs QISKIT_IBM_TOKEN and QISKIT_IBM_INSTANCE then.",
+    )
+    recover.add_argument(
+        "job_id", metavar="JOB_ID", nargs="?", help="the job to archive; omit to list"
+    )
+    recover.add_argument(
+        "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
+    )
+    recover.add_argument(
+        "--record",
+        type=Path,
+        metavar="FILE",
+        help="the pending record to use, for a job whose id was never recorded",
+    )
+    recover.add_argument(
+        "--force",
+        action="store_true",
+        help="recover a job its submitter still holds, or discard a record that names a job",
+    )
+    recover.add_argument(
+        "--discard",
+        type=Path,
+        metavar="FILE",
+        help="remove a pending record for a job that never ran",
+    )
+    recover.set_defaults(handler=_recover)
 
     run = commands.add_parser("run", help="run an experiment on real IBM hardware")
     experiments = run.add_subparsers(dest="experiment", required=True, metavar="EXPERIMENT")
@@ -313,7 +346,7 @@ def _harvest_from_run(args: argparse.Namespace) -> int:
     try:
         result = harvest.extract_run(args.from_run, Pool(args.pool))
     except (OSError, ValueError, ArchiveError) as error:
-        print(f"coin harvest: {error}", file=sys.stderr)
+        print(f"coin harvest: {_explain(error)}", file=sys.stderr)
         return 1
     # The run was archived when it ran; this only extracted from it.
     _report_harvest(result, archived=False)
@@ -365,7 +398,7 @@ def _harvest_new(args: argparse.Namespace) -> int:  # noqa: PLR0911 - each retur
         print(f"coin harvest: install the ibm extra ({error})", file=sys.stderr)
         return 1
     except (ValueError, RuntimeError, ArchiveError, OSError) as error:
-        print(f"coin harvest: {error}", file=sys.stderr)
+        print(f"coin harvest: {_explain(error)}", file=sys.stderr)
         return 1
     _report_harvest(result)
     return 0
@@ -419,11 +452,58 @@ def _compare(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fetcher() -> Fetcher:
+    # Imported here, like _transport, so that every other command works without Qiskit.
+    from coin.ibm import IBMTransport  # noqa: PLC0415
+
+    return IBMTransport()
+
+
 def _transport() -> Transport:
     # Imported here so that every other command works without the `ibm` extra.
     from coin.ibm import IBMTransport  # noqa: PLC0415
 
     return IBMTransport()
+
+
+def _explain(error: BaseException) -> str:
+    """An error and its notes: `submit` notes how to recover a job it could not archive."""
+    return "\n".join([str(error), *getattr(error, "__notes__", [])])
+
+
+def _recover(args: argparse.Namespace) -> int:
+    if args.discard is not None:
+        try:
+            discard(args.discard, force=args.force)
+        except (OSError, ValueError) as error:
+            print(f"coin recover: {error}", file=sys.stderr)
+            return 1
+        print(f"discarded    {args.discard}")
+        return 0
+    if args.job_id is None:
+        waiting = pending_runs(args.runs_dir)
+        if not waiting:
+            print(f"no jobs are waiting to be archived for {args.runs_dir}")
+        for p in waiting:
+            if p.record is None:
+                print(f"{p.path}  {p.problem}")
+                continue
+            job = p.record.get("job_id") or "(no job id recorded)"
+            print(f"{job}  {p.record['backend']}  submitted {p.record['submitted_at']}  {p.path}")
+        return 0
+    try:
+        directory = recover(_fetcher, args.job_id, args.runs_dir, args.record, force=args.force)
+    except ImportError as error:
+        print(f"coin recover: install the ibm extra ({error})", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, RuntimeError, ArchiveError) as error:
+        print(f"coin recover: {_explain(error)}", file=sys.stderr)
+        return 1
+    print(f"archived     {directory}")
+    run = load_run(directory)
+    if run.prediction is not None and run.prediction.values.get("purpose") == "harvest":
+        print(f"next         `coin harvest --from-run {directory}` adds its bits to the pool")
+    return 0
 
 
 def _readout(args: argparse.Namespace) -> int:
@@ -450,7 +530,7 @@ def _readout(args: argparse.Namespace) -> int:
         print(f"coin run: install the ibm extra ({error})", file=sys.stderr)
         return 1
     except (ValueError, RuntimeError, ArchiveError) as error:
-        print(f"coin run readout: {error}", file=sys.stderr)
+        print(f"coin run readout: {_explain(error)}", file=sys.stderr)
         return 1
     print(f"archived     {directory}")
     print(f"published    {hits} of {total} qubits read within 3σ of their published error")  # noqa: RUF001 - σ is the display text
@@ -474,7 +554,7 @@ def _chip_map(args: argparse.Namespace) -> int:
         print(f"coin run: install the ibm extra ({error})", file=sys.stderr)
         return 1
     except (ValueError, RuntimeError, ArchiveError) as error:
-        print(f"coin run chip-map: {error}", file=sys.stderr)
+        print(f"coin run chip-map: {_explain(error)}", file=sys.stderr)
         return 1
     run = load_run(directory)
     tails = chipmap.tails_by_qubit(run)

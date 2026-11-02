@@ -13,6 +13,7 @@ Credentials come from QISKIT_IBM_TOKEN and QISKIT_IBM_INSTANCE and are scrubbed 
 error this module raises. Install with the `ibm` extra.
 """
 
+import contextlib
 import json
 import os
 from collections.abc import Callable, Sequence
@@ -34,7 +35,15 @@ class MissingCredentialsError(ValueError):
 
 
 class IBMError(RuntimeError):
-    """Something failed talking to IBM; the message never contains a credential."""
+    """Something failed talking to IBM; the message never contains a credential.
+
+    `job_id` is set when the failure came after IBM accepted the job: the QPU time is spent,
+    and the job can still be fetched by that id.
+    """
+
+    def __init__(self, message: str, job_id: str | None = None) -> None:
+        super().__init__(message)
+        self.job_id = job_id
 
 
 class IBMTransport:
@@ -53,18 +62,59 @@ class IBMTransport:
         properties = self._guard(lambda: self._service.backend(backend).properties().to_dict())
         return json.loads(json.dumps(properties, default=str))
 
-    def run(self, backend: str, qasm: str, layout: Sequence[int], shots: int) -> JobResult:
+    def run(
+        self,
+        backend: str,
+        qasm: str,
+        layout: Sequence[int],
+        shots: int,
+        on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+    ) -> JobResult:
         target, isa, executed = self._guard(lambda: self._map(backend, qasm, layout))
         sampler = self._guard(lambda: sampler_for(target))
         options = _plain(sampler.options)
         submitted_at = datetime.now(UTC)
-        job = self._guard(lambda: sampler.run([isa], shots=shots))
-        # From here the QPU time is spent: every failure must name the job so it can be fetched.
-        job_id = self._guard(job.job_id)
-        return self._guard(
-            lambda: self._collect(job, job_id, submitted_at, executed, options),
-            job_id=job_id,
-        )
+        try:
+            job = self._guard(lambda: sampler.run([isa], shots=shots))
+            job_id = self._guard(job.job_id)
+        except BaseException as error:
+            # The job may already be on the hardware without its id reaching us.
+            setattr(error, "maybe_submitted", True)  # noqa: B010 - not declared on BaseException
+            raise
+        # From here the QPU time is spent: every failure must carry the job id so it can be
+        # fetched, including an interruption (Ctrl-C while waiting in the queue).
+        try:
+            if on_submitted is not None:
+                details = {
+                    "submitted_at": submitted_at.isoformat(),
+                    "executed_ops": executed,
+                    "options": options,
+                }
+                # Best effort: the caller's bookkeeping must never abandon a job in the queue,
+                # and the result (or the error) still carries the job id.
+                with contextlib.suppress(Exception):
+                    on_submitted(job_id, details)
+            return self._guard(
+                lambda: self._collect(job, job_id, submitted_at, executed, options),
+                job_id=job_id,
+            )
+        except BaseException as error:
+            if getattr(error, "job_id", None) is None:
+                setattr(error, "job_id", job_id)  # noqa: B010 - BaseException declares no job_id
+            raise
+
+    def fetch(self, backend: str, job_id: str, submitted_at: datetime) -> JobResult:
+        """A finished job's result, by id: for a run whose waiting was cut short.
+
+        What ran (the gate counts and the sampler options) is known only at submission; the
+        pending record keeps them, and `hardware.recover` fills them in.
+        """
+        try:
+            job = self._guard(lambda: self._service.job(job_id))
+            return self._guard(lambda: self._collect(job, job_id, submitted_at, {}, {}))
+        except IBMError as error:
+            # Not "job ran, recover it": this is the recovery, and the job may have failed.
+            raise IBMError(f"fetching job {job_id}: {error}") from None
 
     def _map(
         self, backend_name: str, qasm: str, layout: Sequence[int]
@@ -91,8 +141,12 @@ class IBMTransport:
         result = job.result()
         finished_at = datetime.now(UTC)
         memory = tuple(result[0].data.c.get_bitstrings())
-        usage = job.metrics().get("usage")
-        quantum = usage.get("quantum_seconds") if isinstance(usage, dict) else None
+        # The shots are in hand; the usage is a separate call, and losing it must not lose them.
+        usage = self._usage(job)
+        quantum = None
+        if usage is not None:
+            charged = usage.get("qpu_charge_time_seconds", usage.get("quantum_seconds"))
+            quantum = float(charged) if isinstance(charged, int | float) else None
         return JobResult(
             job_id=job_id,
             submitted_at=submitted_at,
@@ -103,6 +157,15 @@ class IBMTransport:
             executed_ops=executed,
             options=options,
         )
+
+    def _usage(self, job: Any) -> dict[str, Any] | None:
+        """The job's usage record, or None if it cannot be read now (IBM keeps it)."""
+        try:
+            usage = job.metrics().get("usage")
+        # As in _guard, any of Qiskit's error types may arrive; here none of them is fatal.
+        except Exception:
+            return None
+        return usage if isinstance(usage, dict) else None
 
     def _guard[T](self, call: Callable[[], T], *, job_id: str | None = None) -> T:
         failure = ""
@@ -115,10 +178,10 @@ class IBMTransport:
         except Exception as error:
             failure = f"{type(error).__name__}: {self._scrub(str(error))}"
         if job_id is not None:
-            failure = f"job {job_id} ran, but {failure}; fetch its result by that id"
+            failure = f"job {job_id} ran, but {failure}; `coin recover {job_id}` fetches it"
         # Raised outside the except block so the unscrubbed error is neither the cause nor
         # the context of this one, and never prints in a chained traceback.
-        raise IBMError(failure)
+        raise IBMError(failure, job_id=job_id)
 
     def _scrub(self, text: str) -> str:
         return text.replace(self._token, f"<{TOKEN}>").replace(self._instance, f"<{INSTANCE}>")
