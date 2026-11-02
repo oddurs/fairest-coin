@@ -103,6 +103,11 @@ _MAX_LAG = 1_024
 _MAX_ORDER = 16
 # And the commoner bit at each position modulo P, for a bias that cycles with period P.
 _MAX_PERIOD = 256
+# A guesser is scored only on this many guesses or more. On a handful its 99.5% bound sits
+# near 1, and one such guesser would claim any source is predictable. Each guesser needs its
+# own guesses, not the input as a whole: a lag of 20 on 1,000 bits still has 980 guesses, and
+# must still catch a 20-bit pattern repeated.
+_MIN_GUESSES = 100
 
 
 def _upper(p: float, n: int) -> float:
@@ -169,10 +174,10 @@ def min_entropy(bits: npt.ArrayLike) -> float:
     guesses.append(
         max(transition(0, 0), transition(1, 1), math.sqrt(transition(0, 1) * transition(1, 0)))
     )
-    for d in range(1, min(_MAX_LAG, n - 1) + 1):
+    for d in range(1, min(_MAX_LAG, n - _MIN_GUESSES) + 1):
         same = int(np.count_nonzero(x[d:] == x[:-d]))
         guesses.append(_upper(max(same, n - d - same) / (n - d), n - d))
-    for k in range(1, min(_MAX_ORDER, n - 1) + 1):
+    for k in range(1, min(_MAX_ORDER, n - _MIN_GUESSES) + 1):
         hits = _markov_hits(x, k)
         guesses.append(_upper(hits / (n - k), n - k))
     positions = np.arange(n)

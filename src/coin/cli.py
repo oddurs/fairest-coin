@@ -315,7 +315,8 @@ def _harvest_from_run(args: argparse.Namespace) -> int:
     except (OSError, ValueError, ArchiveError) as error:
         print(f"coin harvest: {error}", file=sys.stderr)
         return 1
-    _report_harvest(result)
+    # The run was archived when it ran; this only extracted from it.
+    _report_harvest(result, archived=False)
     return 0
 
 
@@ -337,10 +338,17 @@ def _harvest_new(args: argparse.Namespace) -> int:  # noqa: PLR0911 - each retur
         print(f"backend      {args.backend}")
         print(f"qubit        {chosen.qubit}, the one whose calibrated readout errs least")
         print(f"predicted    P(tails) = {chosen.p_tails:.4f}")
-        print(f"shots        {args.shots:,}, about {chosen.expected_bits:,} bits after extraction")
+        print(
+            f"shots        {args.shots:,}, forecast {chosen.expected_bits:,} bits after "
+            "extraction (fewer if the qubit misbehaves)"
+        )
         print(f"estimated    ~{chipmap.estimate_qpu_seconds(args.shots):.0f} QPU seconds")
-        if chosen.expected_bits < 1:
-            print("coin harvest: that would yield no bits; ask for more shots", file=sys.stderr)
+        if chosen.expected_bits < harvest.MIN_HARVEST_BITS:
+            print(
+                f"coin harvest: forecast under {harvest.MIN_HARVEST_BITS:,} bits; "
+                "ask for more shots",
+                file=sys.stderr,
+            )
             return 1
         if args.dry_run:
             print("dry run: nothing submitted")
@@ -363,9 +371,9 @@ def _harvest_new(args: argparse.Namespace) -> int:  # noqa: PLR0911 - each retur
     return 0
 
 
-def _report_harvest(result: harvest.Harvest) -> None:
+def _report_harvest(result: harvest.Harvest, *, archived: bool = True) -> None:
     e = result.extraction
-    print(f"archived     {result.run_dir}")
+    print(f"{'archived' if archived else 'run':<12} {result.run_dir}")
     print(
         f"extracted    {len(e.bits):,} bits: min-entropy estimate {e.estimate:.4f} per shot, "
         f"half spent (ε = {e.epsilon:.1e})"
