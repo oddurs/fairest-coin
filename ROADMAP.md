@@ -28,7 +28,6 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 ### backlog
 
 - [ ] [`0082`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0082-bring-the-essay-up-to-date-with-what-v0-3-found.md) Bring the essay up to date with what v0.3 found <sup>docs · p1 · essay</sup>
-- [ ] [`0083`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0083-leave-room-for-the-squash-suffix-in-commit-subjects.md) Leave room for the squash suffix in commit subjects <sup>chore · p3 · tooling</sup>
 - [ ] [`0084`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0084-rebuild-the-v0-4-plan-on-what-v0-2-and-v0-3-found.md) Rebuild the v0.4 plan on what v0.2 and v0.3 found <sup>chore · p0 · chsh</sup>
 - [ ] [`0085`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0085-cut-v0-3-1.md) Cut v0.3.1 <sup>chore · p0 · tooling</sup>
 
@@ -41,6 +40,7 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 - [x] [`0079`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0079-report-a-chip-map-whose-calibration-had-no-readout-length.md) Report a chip map whose calibration had no readout length <sup>bug · p2 · hardware</sup>
 - [x] [`0080`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0080-stop-counting-gate-relaxation-twice-in-the-noise-model.md) Stop counting gate relaxation twice in the noise model <sup>bug · p3 · noise</sup>
 - [x] [`0081`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0081-close-the-four-test-gaps-the-review-s-mutants-found.md) Close the four test gaps the review's mutants found <sup>chore · p2 · tooling</sup>
+- [x] [`0083`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0083-leave-room-for-the-squash-suffix-in-commit-subjects.md) Leave room for the squash suffix in commit subjects <sup>chore · p3 · tooling</sup>
 
 ## v0.2 — The real coin
 

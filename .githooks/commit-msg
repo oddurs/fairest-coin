@@ -1,5 +1,6 @@
 #!/bin/sh
-# Conventional Commits, subject ≤ 72 characters, no trailing period, no attribution.
+# Conventional Commits, subject ≤ 64 characters, no trailing period, no attribution.
+# 64, not 72: a squash merge appends " (#N)", and the subject on main must stay within 72.
 set -eu
 
 msg_file=$1
@@ -17,8 +18,8 @@ if ! echo "$subject" | grep -Eq '^(feat|fix|chore|docs|perf|refactor|test|build|
   exit 1
 fi
 length=$(printf '%s' "$subject" | wc -m | tr -d ' ')
-if [ "$length" -gt 72 ]; then
-  echo "✗ commit subject is $length characters; the limit is 72" >&2
+if [ "$length" -gt 64 ]; then
+  echo "✗ commit subject is $length characters; the limit is 64 (a squash adds \" (#N)\" to reach 72)" >&2
   exit 1
 fi
 case "$subject" in
