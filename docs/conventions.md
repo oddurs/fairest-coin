@@ -1,11 +1,6 @@
----
-paths:
-  - "src/coin/**/*.py"
-  - "tests/**/*.py"
-  - "docs/chapters/**/*.md"
----
-
 # Physics conventions
+
+The code, the tests and the essay all follow these.
 
 - Follow Qiskit's conventions so hardware results need no translation: little-endian
   qubit order (qubit 0 is the rightmost bit of an outcome string), and
