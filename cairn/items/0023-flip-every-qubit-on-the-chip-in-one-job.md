@@ -39,3 +39,7 @@ From spike 0015: one 4,096-shot job resolves ±0.78% per qubit, but the median p
 ## 2026-11-01
 
 From spike 0018: record two predictions per qubit, readout-only (the model) and readout + measurement-window decay (the double-counting alternative). The chip map then tests which one the hardware agrees with.
+
+## 2026-11-01
+
+From 0022: the executor Sampler has dry_run=True to estimate usage without QPU execution, but the adapter uses SamplerV2 (proven on hardware) for now. Estimate the chip-map cost from the backend's rep delay, readout and gate lengths times shots, and from spike 0015's 3 s per 4,096-shot job.

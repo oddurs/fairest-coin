@@ -21,17 +21,17 @@
 
 ## v0.2 — The real coin
 
-`########··` 72% · 13 of 18 done · due 2026-11-22
+`########··` 74% · 14 of 19 done · due 2026-11-22
 
 `coin predict` forecasts every qubit's coin bias from IBM's calibration data, and the
 
 ### backlog
 
-- [ ] [`0022`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0022-submit-circuits-to-ibm-through-one-isolated-adapter.md) Submit circuits to IBM through one isolated adapter <sup>feature · p0 · hardware</sup>
 - [ ] [`0023`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0023-flip-every-qubit-on-the-chip-in-one-job.md) Flip every qubit on the chip in one job <sup>feature · p0 · hardware</sup>
 - [ ] [`0025`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0025-draw-the-chip-map-and-the-prediction-scatter.md) Draw the chip map and the prediction scatter <sup>feature · p1 · figures</sup>
 - [ ] [`0026`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0026-write-chapter-2-predict-the-real-coin.md) Write chapter 2: predict the real coin <sup>docs · p0 · essay</sup>
 - [ ] [`0027`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0027-cut-v0-2-0.md) Cut v0.2.0 <sup>chore · p0 · tooling</sup>
+- [ ] [`0067`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0067-make-the-property-tests-deterministic.md) Make the property tests deterministic <sup>chore · p1 · tooling</sup>
 
 ### done
 
@@ -42,6 +42,7 @@
 - [x] [`0019`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0019-archive-every-hardware-run-with-its-calibration-snapshot.md) Archive every hardware run with its calibration snapshot <sup>feature · p0 · hardware</sup>
 - [x] [`0020`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0020-lower-single-qubit-gates-to-the-native-rz-sx-x-basis.md) Lower single-qubit gates to the native rz/sx/x basis <sup>feature · p0 · compile</sup>
 - [x] [`0021`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0021-predict-each-qubit-s-coin-bias-from-calibration-data.md) Predict each qubit's coin bias from calibration data <sup>feature · p0 · noise</sup>
+- [x] [`0022`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0022-submit-circuits-to-ibm-through-one-isolated-adapter.md) Submit circuits to IBM through one isolated adapter <sup>feature · p0 · hardware</sup>
 - [x] [`0024`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0024-regenerate-figures-deterministically-from-the-archive.md) Regenerate figures deterministically from the archive <sup>feature · p1 · figures</sup>
 - [x] [`0061`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0061-reject-non-finite-angles-and-non-integer-indices-in-the-ir.md) Reject non-finite angles and non-integer indices in the IR <sup>bug · p1 · sim</sup>
 - [x] [`0062`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0062-apply-the-negligible-cutoff-per-outcome-and-only-build-occurring-outcomes.md) Apply the negligible cutoff per outcome, and only build occurring outcomes <sup>bug · p1 · sim</sup>
@@ -105,7 +106,7 @@ The whole essay, from "your coin is unfair" to "what it would really take", wher
 
 ## later — Good ideas off the path
 
-`··········` 0% · 0 of 6 done
+`··········` 0% · 0 of 7 done
 
 Nothing on a schedule. Ideas that are good but not on the road to v1.0 land here instead
 
@@ -117,4 +118,5 @@ Nothing on a schedule. Ideas that are good but not on the road to v1.0 land here
 - [ ] [`0058`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0058-add-a-toeplitz-hashing-extractor.md) Add a Toeplitz-hashing extractor <sup>feature · p3 · extract</sup>
 - [ ] [`0059`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0059-implement-a-two-party-quantum-coin-flipping-protocol.md) Implement a two-party quantum coin-flipping protocol <sup>feature · p3 · chsh</sup>
 - [ ] [`0060`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0060-compare-coins-across-ibm-processor-generations.md) Compare coins across IBM processor generations <sup>feature · p3 · hardware</sup>
+- [ ] [`0066`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0066-move-the-ibm-adapter-to-the-client-side-executor-sampler.md) Move the IBM adapter to the client-side executor Sampler <sup>chore · p2 · hardware</sup>
 
