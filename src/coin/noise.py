@@ -71,6 +71,35 @@ def depolarizing(p: float, qubit: int) -> Channel:
     return Channel((identity, *(math.sqrt(p / 4) * pauli for pauli in paulis)), (qubit,))
 
 
+def average_infidelity(channels: tuple[Channel, ...]) -> float:
+    """1 − F_avg of one-qubit channels applied in order, against doing nothing.
+
+    F_avg = (d·F_e + 1)/(d + 1) with d = 2, and the entanglement fidelity F_e = Σ|Tr K|²/d²
+    over the Kraus operators of the composed channel (every product of one from each).
+    """
+    kraus = [np.eye(2, dtype=np.complex128)]
+    for channel in channels:
+        if len(channel.qubits) != 1:
+            raise ValueError("average_infidelity takes one-qubit channels")
+        kraus = [k @ before for k in channel.kraus for before in kraus]
+    entanglement = sum(abs(np.trace(k)) ** 2 for k in kraus) / 4
+    return 1 - (2 * entanglement + 1) / 3
+
+
+def gate_depolarizing(gate_error: float, relaxation: tuple[Channel, ...]) -> float:
+    """The depolarizing p that, after `relaxation`, makes up a gate's reported error.
+
+    IBM's gate_error is the gate's whole average infidelity, relaxation included, so the
+    depolarizing part takes only what relaxation does not explain: p = 2(r − r₁)/(1 − 2r₁),
+    which makes the two together exactly r, and 0 where relaxation alone exceeds r (Qiskit
+    Aer builds its device noise the same way).
+    """
+    relaxed = average_infidelity(relaxation)
+    if gate_error <= relaxed:
+        return 0.0
+    return min(1.0, 2 * (gate_error - relaxed) / (1 - 2 * relaxed))
+
+
 @dataclass(frozen=True)
 class Readout:
     """A measurement that misreports: P(read 1 | was 0) and P(read 0 | was 1).
@@ -247,11 +276,9 @@ def predict_tails(noise: QubitNoise, circuit: Circuit, *, measurement_decay: boo
                 f"no calibration for gate {op.name}; lower the circuit to native gates first"
             )
         cal = noise.gates[op.name]
-        # IBM reports average gate error r; for one qubit, depolarizing p = 2r.
-        return (
-            *thermal_relaxation(noise.t1_ns, noise.t2_ns, cal.length_ns, 0),
-            depolarizing(min(1.0, 2 * cal.error), 0),
-        )
+        relaxation = thermal_relaxation(noise.t1_ns, noise.t2_ns, cal.length_ns, 0)
+        # IBM's average gate error r already includes relaxation; depolarizing makes up the rest.
+        return (*relaxation, depolarizing(gate_depolarizing(cal.error, relaxation), 0))
 
     true = probabilities(circuit, channels)
     return apply_readout(true, {0: noise.readout}).get("1", 0.0)

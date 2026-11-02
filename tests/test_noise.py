@@ -11,8 +11,10 @@ from coin.noise import (
     Readout,
     amplitude_damping,
     apply_readout,
+    average_infidelity,
     coherent_bias_bound,
     depolarizing,
+    gate_depolarizing,
     phase_damping,
     thermal_relaxation,
 )
@@ -179,3 +181,38 @@ def test_the_bound_for_a_typical_heron_sx() -> None:
 def test_the_bound_refuses_an_impossible_gate_error(bad: float) -> None:
     with pytest.raises(ValueError, match="2/3"):
         coherent_bias_bound(bad)
+
+
+def test_average_infidelity_matches_closed_forms() -> None:
+    assert average_infidelity(()) == pytest.approx(0.0, abs=EXACT)
+    # Depolarizing at p: F_avg = 1 − p/2.
+    assert average_infidelity((depolarizing(0.3, 0),)) == pytest.approx(0.15, abs=EXACT)
+    # Amplitude damping at γ: F_e = (1 + √(1−γ))²/4.
+    gamma = 0.2
+    f_e = (1 + math.sqrt(1 - gamma)) ** 2 / 4
+    expected = 1 - (2 * f_e + 1) / 3
+    assert average_infidelity((amplitude_damping(gamma, 0),)) == pytest.approx(expected, abs=EXACT)
+
+
+@given(
+    st.floats(50_000, 400_000),
+    st.floats(0.2, 1.0),
+    st.floats(10, 200),
+    st.floats(1e-5, 5e-3),
+)
+def test_relaxation_and_depolarizing_together_make_the_reported_error(
+    t1: float, t2_fraction: float, length: float, gate_error: float
+) -> None:
+    relaxation = thermal_relaxation(t1, 2 * t1 * t2_fraction, length, 0)
+    p = gate_depolarizing(gate_error, relaxation)
+    total = average_infidelity((*relaxation, depolarizing(p, 0)))
+    if average_infidelity(relaxation) < gate_error:
+        # Not relaxation plus 2r on top: exactly the reported error, as IBM measured it.
+        assert total == pytest.approx(gate_error, rel=1e-9)
+    else:
+        assert p == pytest.approx(0.0, abs=EXACT)
+
+
+def test_relaxation_beyond_the_reported_error_leaves_no_depolarizing() -> None:
+    # T1 = 10 µs over a 1 µs gate relaxes far more than a 1e-4 error allows.
+    assert gate_depolarizing(1e-4, thermal_relaxation(10_000, 20_000, 1_000, 0)) == 0.0
