@@ -62,7 +62,6 @@
 - [ ] [`0035`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0035-write-chapter-3-make-it-fair.md) Write chapter 3: make it fair <sup>docs · p0 · essay</sup>
 - [ ] [`0036`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0036-cut-v0-3-0.md) Cut v0.3.0 <sup>chore · p0 · tooling</sup>
 - [ ] [`0069`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0069-find-out-why-the-chip-map-prediction-missed.md) Find out why the chip-map prediction missed <sup>spike · p1 · noise</sup>
-- [ ] [`0070`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0070-extract-with-toeplitz-hashing-from-a-min-entropy-estimate.md) Extract with Toeplitz hashing from a min-entropy estimate <sup>feature · p0 · extract</sup>
 
 ### done
 
@@ -70,6 +69,7 @@
 - [x] [`0029`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0029-mitigate-readout-error-on-estimated-distributions.md) Mitigate readout error on estimated distributions <sup>feature · p2 · extract</sup>
 - [x] [`0030`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0030-debias-bits-with-the-von-neumann-extractor.md) Debias bits with the von Neumann extractor <sup>feature · p0 · extract</sup>
 - [x] [`0031`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0031-build-a-randomness-test-battery-from-scratch.md) Build a randomness test battery from scratch <sup>feature · p0 · extract</sup>
+- [x] [`0070`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0070-extract-with-toeplitz-hashing-from-a-min-entropy-estimate.md) Extract with Toeplitz hashing from a min-entropy estimate <sup>feature · p0 · extract</sup>
 
 ## v0.4 — The certified coin
 
@@ -109,7 +109,7 @@ The whole essay, from "your coin is unfair" to "what it would really take", wher
 
 ## later — Good ideas off the path
 
-`··········` 0% · 0 of 7 done
+`··········` 0% · 0 of 8 done
 
 Nothing on a schedule. Ideas that are good but not on the road to v1.0 land here instead
 
@@ -122,4 +122,5 @@ Nothing on a schedule. Ideas that are good but not on the road to v1.0 land here
 - [ ] [`0059`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0059-implement-a-two-party-quantum-coin-flipping-protocol.md) Implement a two-party quantum coin-flipping protocol <sup>feature · p3 · chsh</sup>
 - [ ] [`0060`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0060-compare-coins-across-ibm-processor-generations.md) Compare coins across IBM processor generations <sup>feature · p3 · hardware</sup>
 - [ ] [`0066`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0066-move-the-ibm-adapter-to-the-client-side-executor-sampler.md) Move the IBM adapter to the client-side executor Sampler <sup>chore · p2 · hardware</sup>
+- [ ] [`0071`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0071-tighten-the-min-entropy-estimate-for-hidden-state-sources.md) Tighten the min-entropy estimate for hidden-state sources <sup>feature · p3 · extract</sup>
 
