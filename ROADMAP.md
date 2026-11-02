@@ -54,7 +54,7 @@
 
 `coin harvest` collects real hardware bits, debiases them, and fills a local pool;
 
-### backlog
+### in progress
 
 - [ ] [`0036`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0036-cut-v0-3-0.md) Cut v0.3.0 <sup>chore · p0 · tooling</sup>
 

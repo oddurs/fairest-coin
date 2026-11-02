@@ -6,6 +6,45 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-02
+
+The fair coin: real hardware flips, made fair without knowing their bias, spent one at a
+time with a receipt, and an honest account of what no test can prove.
+
+### Added
+
+- `coin harvest --backend NAME --shots N (--dry-run | --submit | --from-run DIR)` runs
+  the coin on the qubit whose readout errs least and archives the raw run. It then
+  extracts near-uniform bits with Toeplitz hashing and adds them to a local entropy pool.
+- `coin pool` shows each batch in the pool and how much of it is spent.
+- `coin flip` without `--sim` spends one pool bit, never twice, even across processes.
+  It prints a receipt (backend, qubit, job, run, extraction). `--json` emits the receipt
+  per `docs/receipt.schema.json`, and `--quiet` prints only the face.
+- `coin run readout --prepare {0,1}` prepares |0⟩ or |1⟩ on every qubit and measures,
+  testing the backend's published readout directly.
+- `coin.extract`:
+  - `von_neumann` and `peres`;
+  - `min_entropy`, a conservative estimate that does not assume independence, built from
+    bias, worst-block, Markov, lag, online-Markov and phase guessers;
+  - `toeplitz` and `toeplitz_extract`, which spend half the estimate.
+- `coin.battery`: monobit, block frequency, runs, longest run and serial tests from NIST
+  SP 800-22, reproducing its worked examples. Also `pi_bits`, which passes all of them.
+- `coin.mitigate`: readout correction of estimated distributions (not bits).
+- `coin.pool`: the on-disk pool, with locking and durable, atomic writes.
+- Spikes 0028 (are the hardware bits independent?) and 0069 (why did the chip-map
+  prediction miss?), with their analysis scripts and runs.
+- Four new hardware runs: two readout jobs, a second chip map, and a 100,000-shot harvest.
+  The harvest was committed with its extraction record after its batch was spent.
+- The before-and-after extraction figure.
+- Chapter 3, "Make it fair".
+
+### Fixed
+
+- `chipmap.compare` refused a single-qubit run only by crashing.
+- Time-relative test cases were built at collection, so a sleeping machine could stale
+  them. Tests that run five minutes now dump their stack.
+- `coin pool`'s table did not line up with real batch names.
+
 ## [0.2.0] - 2026-11-01
 
 The real coin: every qubit of an IBM quantum computer flipped at once, each one predicted
@@ -51,6 +90,7 @@ The ideal coin: a quantum coin built from scratch, flipped on a simulator.
 - A test suite that runs every example, code excerpt and command quoted in the chapters
   and the README.
 
-[Unreleased]: https://github.com/oddurs/fairest-coin/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/oddurs/fairest-coin/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/oddurs/fairest-coin/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/oddurs/fairest-coin/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/oddurs/fairest-coin/releases/tag/v0.1.0
