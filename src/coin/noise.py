@@ -257,6 +257,22 @@ def predict_tails(noise: QubitNoise, circuit: Circuit, *, measurement_decay: boo
     return apply_readout(true, {0: noise.readout}).get("1", 0.0)
 
 
+def coherent_bias_bound(gate_error: float) -> float:
+    """The most a purely coherent error of this size can move the coin's P(tails).
+
+    IBM's `gate_error` is an average infidelity from randomized benchmarking, and the model
+    above spends it as depolarizing noise, which leaves the coin exactly fair. The same
+    number fits an unwanted rotation by ε just as well, since 1 − F = (2/3)·sin²(ε/2) for one
+    qubit, and a rotation tilts the coin's equatorial state off the equator by up to ε,
+    moving P(tails) by up to sin(ε)/2. Calibration data cannot tell the two apart, so this is
+    how far it leaves the prediction free to miss.
+    """
+    if not 0 <= gate_error <= 2 / 3:
+        raise ValueError(f"a one-qubit gate error lies in [0, 2/3], got {gate_error}")
+    epsilon = 2 * math.asin(math.sqrt(1.5 * gate_error))
+    return math.sin(min(epsilon, math.pi / 2)) / 2
+
+
 def _number(field: Mapping[str, Any]) -> float:
     value = field.get("value")
     if isinstance(value, bool) or not isinstance(value, int | float):

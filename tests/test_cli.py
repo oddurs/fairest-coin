@@ -59,6 +59,7 @@ def test_hardware_flip_explains_sim(capsys: pytest.CaptureFixture[str]) -> None:
     assert code == 2
     assert out == ""
     assert "--sim" in err
+    assert "coin run chip-map" in err
 
 
 @pytest.mark.parametrize("shots", ["0", "-3", "ten"])

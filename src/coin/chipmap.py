@@ -14,10 +14,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+import numpy as np
+
 from coin.archive import Prediction, Run
 from coin.circuit import Circuit, Gate, Measure
 from coin.hardware import Submission
-from coin.noise import model_from_calibration, predict_tails
+from coin.noise import coherent_bias_bound, model_from_calibration, predict_tails
 
 MAX_SHOTS = 100_000  # the per-job limit IBM's Heron backends report
 # Spike 0015 billed 3 s for 4,096 shots: about 1 s of shots at the default 250 µs repetition
@@ -123,8 +125,9 @@ class QubitResult:
 
 def compare(run: Run) -> list[QubitResult]:
     """Every predicted qubit of an archived chip map against what it measured, by qubit."""
-    if run.prediction is None or "p_tails" not in run.prediction.values:
-        raise ValueError(f"job {run.job_id}: not a chip map; its prediction has no p_tails")
+    # A single-qubit run's p_tails is one number; a chip map's is one per qubit.
+    if run.prediction is None or not isinstance(run.prediction.values.get("p_tails"), dict):
+        raise ValueError(f"job {run.job_id}: not a chip map; it has no p_tails per qubit")
     values = run.prediction.values
     alternative = values.get("p_tails_measurement_decay", {})
     tails = tails_by_qubit(run)
@@ -138,6 +141,103 @@ def compare(run: Run) -> list[QubitResult]:
         )
         for q, p in sorted(values["p_tails"].items(), key=lambda item: int(item[0]))
     ]
+
+
+def report(run: Run) -> str:
+    """An archived chip map against its prediction, in the numbers chapter 2 quotes."""
+    results = compare(run)
+    assert run.prediction is not None  # compare() refuses a run without one
+    values = run.prediction.values
+    lead = (run.submitted_at - run.prediction.written_at).total_seconds()
+    measured = [r.measured - 0.5 for r in results]
+    both = [r for r in results if r.alternative is not None]
+
+    def within_3_sigma(predicted: list[float], rows: list[QubitResult]) -> int:
+        return sum(
+            abs(r.measured - p) <= 3 * math.sqrt(p * (1 - p) / r.shots)
+            for r, p in zip(rows, predicted, strict=True)
+        )
+
+    model_p = [r.predicted for r in results]
+    alternative_p = [r.alternative for r in both if r.alternative is not None]
+    closer = sum(
+        abs(r.measured - r.predicted) < abs(r.measured - a)
+        for r, a in zip(both, alternative_p, strict=True)
+    )
+    calibrated = model_from_calibration(run.calibration).qubits
+    if missing := sorted(r.qubit for r in results if r.qubit not in calibrated):
+        raise ValueError(f"job {run.job_id}: predicted qubits {missing} have no usable calibration")
+    bounds = {r.qubit: coherent_bias_bound(calibrated[r.qubit].gates["sx"].error) for r in results}
+
+    def coherent_reach(q: int) -> float:
+        # The bound limits the qubit's true P(tails); readout shrinks any change in it by the
+        # contrast 1 − p(1|0) − p(0|1) before it reaches the measured fraction.
+        readout = calibrated[q].readout
+        return bounds[q] * (1 - readout.p1_given_0 - readout.p0_given_1)
+
+    explained = sum(
+        abs(r.measured - r.predicted) <= coherent_reach(r.qubit) + 3 * r.sigma for r in results
+    )
+
+    def pct(x: float) -> str:
+        return f"{x:+.2%}"
+
+    rows = [
+        f"run          {run.backend}, job {run.job_id}, "
+        f"{len(run.qubits)} qubits × {run.shots:,} shots",  # noqa: RUF001 - × is the display text
+        f"prediction   written {lead:.1f} s before submission; "
+        f"{len(results)} qubits predicted, {len(values.get('excluded', {}))} excluded",
+        f"{'':29}{'model':>7}{'alternative':>14}",
+        f"{'within 3σ':29}{within_3_sigma(model_p, results):>7}"  # noqa: RUF001 - σ is the display text
+        f"{within_3_sigma(alternative_p, both):>14}",
+        f"{'median bias, predicted':29}{pct(statistics.median(p - 0.5 for p in model_p)):>7}"
+        f"{pct(statistics.median(p - 0.5 for p in alternative_p)):>14}",
+        f"{'median bias, measured':29}{pct(statistics.median(measured)):>7}",
+        f"{'correlation with measured':29}"
+        f"{statistics.correlation(model_p, measured):>+7.2f}"
+        f"{statistics.correlation(alternative_p, [r.measured - 0.5 for r in both]):>+14.2f}",
+        f"{'closer to the measurement':29}{closer:>7}{len(both) - closer:>14}",
+        f"coherent     {explained} of {len(results)} within 3σ if each sx error may be "  # noqa: RUF001 - σ is the display text
+        f"coherent (median bound ±{statistics.median(bounds.values()):.2%})",
+    ]
+    if run.memory is not None:
+        z = _drift(run)
+        moved = sum(abs(v) > 3 for v in z.values())
+        # Coins that held still would pass 3σ by chance with probability erfc(3/√2) each.
+        expected = len(z) * math.erfc(3 / math.sqrt(2))
+        rows.append(
+            f"drift        {moved} of {len(z)} qubits changed by more than 3σ between the run's "  # noqa: RUF001 - σ is the display text
+            f"halves ({expected:.1f} expected if they held still)"
+        )
+    rows.append(f"{'largest misses':17}{'predicted':>12}{'measured':>12}{'off by':>10}")
+    for r in sorted(results, key=lambda r: -abs(r.z))[:5]:
+        rows.append(
+            f"{r.qubit:>5}{'':12}{pct(r.predicted - 0.5):>12}{pct(r.measured - 0.5):>12}"
+            f"{f'{r.z:+.1f}σ':>10}"  # noqa: RUF001 - σ is the display text
+        )
+    return "\n".join(rows)
+
+
+def _drift(run: Run) -> dict[int, float]:
+    """Each measured qubit's change in P(tails) between the two halves of a run, in σ.
+
+    A qubit whose P(tails) held still for the whole job gives a standard normal z, so about
+    0.27% of steady qubits land beyond 3σ. Qubits that never or always came up tails carry
+    no information about change and are left out.
+    """
+    assert run.memory is not None
+    width = len(run.memory[0])
+    bits = np.frombuffer("".join(run.memory).encode(), dtype=np.uint8).reshape(-1, width)
+    tails = (bits == ord("1"))[:, ::-1]  # column i is classical bit i, the rightmost first
+    half = len(tails) // 2
+    first, second = tails[:half].mean(axis=0), tails[half:].mean(axis=0)
+    pooled = tails.mean(axis=0)
+    scale = 1 / half + 1 / (len(tails) - half)
+    return {
+        run.qubits[clbit]: float((second[clbit] - first[clbit]) / math.sqrt(p * (1 - p) * scale))
+        for clbit, p in enumerate(pooled)
+        if 0 < p < 1
+    }
 
 
 def summary(chip: ChipMap) -> str:
