@@ -38,6 +38,11 @@ time with a receipt, and an honest account of what no test can prove.
 - The before-and-after extraction figure.
 - Chapter 3, "Make it fair".
 
+### Changed
+
+- `coin flip` without `--sim` now spends a bit from the entropy pool (and exits 1 with
+  "run `coin harvest`" when it is empty); in 0.2.0 it exited 2 and pointed to `--sim`.
+
 ### Fixed
 
 - `chipmap.compare` refused a single-qubit run only by crashing.

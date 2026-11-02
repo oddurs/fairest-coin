@@ -15,7 +15,9 @@ a 156-qubit IBM Heron processor, 4,096 times. It came up tails 2,071 times: 50.5
 
 ![The first coin: measured 0.5056 ± 0.0078 against predicted 0.4995 ± 0.0078](../figures/first-coin.svg)
 
-The prediction, written down before the job was submitted, was 49.95%. The two agree, but
+The prediction was 49.95%. A dry run wrote it down six minutes before the job was
+submitted (the copy written at submission is identical, and the archive's clock, to the
+second, cannot tell it from the submission). The two agree, but
 only because neither says much. With 4,096 flips the measured fraction wobbles by
 ±0.78% from shot noise alone, and the bias we expect from a real qubit is about half a
 percent. To see it, we need about a hundred thousand flips. And since the qubits can all be
@@ -241,7 +243,7 @@ push the coin:
 '1.68%'
 ```
 
-So a gate error of 0.019% leaves room for a bias of ±1.68%: more than twice the 0.69% that
+So a gate error of 0.019% leaves room for a bias of ±1.68%: more than twice the 0.68% that
 readout gives this qubit, and nearly four times the chip's median readout effect. Across the chip, the median bound is ±2.54%. If any part of each
 qubit's `sx` error is coherent, and nothing in the calibration says it is not, the
 calibration *cannot* predict this coin to better than a couple of percent. Allow for it,
@@ -258,16 +260,33 @@ Nineteen qubits miss by more than even that allows. Two of them show the limits 
 calibration from opposite sides.
 
 **Qubit 59** came up tails 79.8% of the time. Its readout errors are 10.1% and 6.9%, and
-no readout that bad can turn a fair coin into an 80% one. Taken at face value, its readout
-says the qubit was found in |1⟩ 84% of the time; qubit 118, below, is a reason not to take
-readout calibrations entirely at face value. Starting from the wrong state cannot explain
-an 80% coin, because H makes a mixture fair (that is the preparation
-row in the table above). Its gate error bounds a coherent miss at 2.5%. Something
-happened to qubit 59 between the gate and the readout that none of its published numbers
-describe. Candidates include:
-- a defect coupling to the qubit;
-- crosstalk from its neighbours, all measured at the same instant;
-- leakage out of the |0⟩, |1⟩ pair altogether.
+no readout that bad can turn a fair coin into an 80% one. Starting from the wrong state
+cannot explain an 80% coin either, because H makes a mixture fair (that is the preparation
+row in the table above), and its gate error bounds a coherent miss at 2.5%. Something that
+none of its published numbers described was happening to qubit 59.
+
+The next calibration said what. Spike 0069 measured every qubit's readout directly a few
+hours later, and fetched the calibration published in between:
+
+```pycon
+>>> from coin.readout import measured, published_readout
+>>> zero = load_run("data/runs/2026-11-02-dbk2a81kdqps7391ka9g")
+>>> one = load_run("data/runs/2026-11-02-dbk2khgnceqs73al2ojg")
+>>> later_0, _ = published_readout(zero.calibration, 0)
+>>> later_1, _ = published_readout(one.calibration, 1)
+>>> round(later_0[59], 3), round(later_1[59], 3)
+(0.747, 0.188)
+>>> round(0.5 * (1 - later_1[59]) + 0.5 * later_0[59], 3)
+0.78
+>>> direct = measured(zero, one)[59]
+>>> round(direct.p1_given_0, 3), round(direct.p0_given_1, 3)
+(0.066, 0.069)
+```
+
+For a while qubit 59's measurement read heads as tails three times in four: a coin at 78.0%,
+close to the 79.8% it gave. The calibration recorded that after the chip map ran. By the
+time of spike 0069 the readout had recovered (6.6% and 6.9%), and the coin was fair again.
+The readout broke and mended itself between calibrations.
 
 **Qubit 118** is the mirror image. Its calibration says 47.2% of heads are misread as
 tails, which predicts a coin at 64.3% tails. It came up 50.0%, as fair as any qubit on the
@@ -292,20 +311,37 @@ taken before the run, however recent, could have described them exactly.
 
 ## What this means
 
-Spike 0069 asks how to tell these explanations apart. One job would run three circuits on
-every qubit, back to back:
-- prepare |0⟩ and measure;
-- prepare |1⟩ and measure;
-- flip the coin.
+Spike 0069 tested these explanations. Three jobs ran back to back on every qubit: prepare
+|0⟩ and measure, prepare |1⟩ and measure, and the coin again. The first two measure each
+qubit's readout as a job actually sees it, and the published readout matched poorly
+(qubit 59 above is the extreme case).
 
-The first two measure each qubit's readout under exactly the coin's conditions. What is
-left of the coin's bias after that comes from the gate and what follows it.
+Undoing the measured readout recovers what the coin did before it was read:
 
-For the question this project asks, the result already matters. Chapter 0 distrusted
-random numbers that come from a process you have to take on faith. This chapter took the
-manufacturer's own description of its device and found that it does not predict how the
-device's coins lean, or even which way. The bias is real, it is different on every qubit,
-and it moves.
+```pycon
+>>> import statistics
+>>> from coin.chipmap import tails_by_qubit
+>>> second = load_run("data/runs/2026-11-02-dbk2l21kdqps7391l420")
+>>> tails = tails_by_qubit(second)
+>>> before = [
+...     (tails[q] / second.shots - r.p1_given_0) / (1 - r.p1_given_0 - r.p0_given_1) - 0.5
+...     for q, r in measured(zero, one).items()
+...     if 1 - r.p1_given_0 - r.p0_given_1 > 0.05
+... ]
+>>> len(before), f"{statistics.median(before):+.2%}"
+(155, '+0.63%')
+```
+
+Before it is measured, the typical coin leans *tails* by 0.63%: a chip-wide lean in the
+state preparation, within what a coherent `sx` error of the published size allows. The
+readout then pulls toward heads. That is why the prediction, built on readout alone, had the
+sign wrong.
+
+For the question this project asks, the result matters. Chapter 0 distrusted random numbers
+that come from a process you have to take on faith. This chapter took the manufacturer's
+own description of its device and found that it does not predict how the device's coins
+lean, or even which way. The bias is real, it is different on every qubit, and the largest
+parts of it come and go.
 
 So the way forward cannot depend on knowing the bias. Chapter 3 does not try to predict
 it. It removes it, with a procedure that makes a biased coin fair without knowing the bias,

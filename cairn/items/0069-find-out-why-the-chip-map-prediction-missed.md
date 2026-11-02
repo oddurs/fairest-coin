@@ -60,7 +60,7 @@ per-qubit prediction hopeless.** Evidence:
 1. **Readout excursions caused the worst misses.**
    - Qubits 59, 29, 48 and 34 came up 65–80% tails in the first chip map.
    - The next published calibration recorded broken readout on 34, 48 and 59, with p(1|0)
-     of 0.56–0.75. Qubit 59's published (0.747, 0.188) predicts a 77.9% coin; it measured
+     of 0.56–0.75. Qubit 59's published (0.747, 0.188) predicts a 78.0% coin; it measured
      79.8%.
    - 4.7 hours later the readout had recovered: measured p(1|0) was 0.000, 0.025 and 0.066.
      Their coins read 51.0%, 49.2% and 49.8%.
@@ -74,9 +74,12 @@ per-qubit prediction hopeless.** Evidence:
      (median bound ±2.53%).
    - Readout pulls the coin toward heads, and preparation pushes it further toward tails.
      That is why chapter 2 predicted −0.45% and measured +0.45%.
-3. **The qubits change over hours.**
-   - Measured coin bias in the two chip maps, 4.7 hours apart, correlates at −0.05 across
-     qubits. New outliers appeared: qubit 90 at +9.1%, 85 at +5.6%.
+3. **The large leans come and go over hours.**
+   - Measured coin bias in the two chip maps, 4.7 hours apart: rank correlation +0.31, and
+     +0.24 for the 144 qubits within 5% of fair in both, so ordinary leans partly persist.
+     The large ones do not: the plain correlation, dominated by them, is −0.05, and new
+     outliers appeared (qubit 90 at +9.1%, 85 at +5.6%). (Corrected after the v0.1–v0.3
+     review; this first read only the −0.05.)
    - Even with readout measured in the same session (23 minutes before the coin, because
      of queueing), the readout-only model put 59 of 156 coins within 3σ. With published
      readout, the same coin run scored 44 of 147.
@@ -106,4 +109,8 @@ Tooling built: coin run readout --backend --shots N --prepare {0,1} (--dry-run|-
 
 ## Result
 
-Three causes: transient readout excursions (34/48/59 read 56–75% p(1|0) in the published calibration, recovered to 0–7% hours later); a chip-wide state-preparation tails lean of +0.63% median once measured readout is undone, within the coherent sx bound on 144/147 qubits; and per-qubit bias that does not persist across hours (run-to-run correlation −0.05 over 4.7 h). Published readout correlates with measured at +0.46 (p(1|0)). Prediction of a single qubit's bias is not achievable; extraction is.
+Three causes: transient readout excursions (34/48/59 read 56–75% p(1|0) in the published calibration, recovered to 0–7% hours later); a chip-wide state-preparation tails lean of +0.63% median once measured readout is undone, within the coherent sx bound on 144/147 qubits; and large per-qubit leans that come and go within hours (ordinary leans partly persist: rank correlation +0.31 over 4.7 h, though the plain correlation is −0.05). Published readout correlates with measured at +0.46 (p(1|0)). Prediction of a single qubit's bias is not achievable; extraction is.
+
+## 2026-11-02
+
+Correction (review of v0.1–v0.3): conclusion 3 is overstated. The −0.05 between the two chip maps is a Pearson correlation dominated by a dozen outliers; rank correlation is +0.31 (p ≈ 1e-4), and the 144 qubits within 5% of fair in both maps correlate at +0.24. Ordinary per-qubit leans partly persist; the large excursions are what come and go. Also, qubit 59's later published readout predicts 78.0% (0.7798), not 77.9%. Chapters 2 and 3 now say this, with the numbers computed in tested examples.
