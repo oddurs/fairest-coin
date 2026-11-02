@@ -4,6 +4,7 @@ import argparse
 import gzip
 import json
 import math
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -361,6 +362,9 @@ def _harvest(args: argparse.Namespace) -> int:
 
 def _tracked_by_git(path: Path) -> bool:
     """Whether git tracks anything in `path`: if so its shots are, or will be, public."""
+    # Git's own variables (set, for one, while a hook runs) would point it at another
+    # repository than the one `path` is in; let it find the right one from `path`.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     try:
         listed = subprocess.run(
             ["git", "ls-files", "--", str(path)],
@@ -368,6 +372,7 @@ def _tracked_by_git(path: Path) -> bool:
             capture_output=True,
             text=True,
             check=False,
+            env=env,
         )
     except OSError:  # no git on this machine: nothing it could have published
         return False

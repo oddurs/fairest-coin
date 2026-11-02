@@ -445,3 +445,17 @@ def test_a_run_with_no_prediction_is_named_as_such(
     monkeypatch.setattr(harvest, "load_run", lambda d: replace(real(d), prediction=None))
     with pytest.raises(ValueError, match="has no prediction"):
         harvest.extract_run(run_dir, Pool(tmp_path / "p"))
+
+
+def test_git_tracking_is_judged_by_the_runs_own_repository(
+    calibration: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    # Inside a git hook GIT_DIR points at this repository; a run outside it is still untracked.
+    monkeypatch.setenv("GIT_DIR", str(ROOT / ".git"))
+    chosen = harvest.plan("b", calibration, SHOTS)
+    run_dir = harvest.submit(FakeTransport(calibration), chosen.submission, tmp_path / "runs")
+    code, _, err = cli_run(["harvest", "--from-run", str(run_dir)], capsys)
+    assert code == 0, err
