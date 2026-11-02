@@ -30,3 +30,7 @@ randomness, what can?"
 - [ ] Every number traceable to an archived run
 - [ ] States the extractor's independence assumption and cites the spike's evidence
 - [ ] Linked from the README's chapter index
+
+## 2026-11-01
+
+Chapter 3 material from spike 0028: qubit 88. Von Neumann makes its bits pass every fairness test, while a periodic disturbance at 0.489 cycles/shot leaves the output correlated. 'Fair' and 'independent' are different claims. Also qubit 34's telegraph switching between about 52% and 72% tails.
