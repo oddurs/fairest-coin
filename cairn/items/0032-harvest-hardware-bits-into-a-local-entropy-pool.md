@@ -40,3 +40,7 @@ unspent bit.
 ## 2026-11-01
 
 From spike 0028: extract with Toeplitz hashing (0070), not von Neumann. And screen each batch's qubit with analysis/independence.py's tests: 5 of 156 qubits had time structure in the chip-map run, and which ones will change between runs.
+
+## 2026-11-01
+
+From 0070: use toeplitz_extract's default (half the min-entropy estimate) and record the Extraction fields per batch: entropy_per_bit, estimate, epsilon, input_bits, seed_used, and the seed itself. Qubit 88's 100,000 chip-map shots give about 44,000 bits this way.
