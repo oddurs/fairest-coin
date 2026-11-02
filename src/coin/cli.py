@@ -11,12 +11,13 @@ from typing import Any
 
 import numpy as np
 
-from coin import __version__, chipmap
+from coin import __version__, chipmap, harvest
 from coin.archive import ArchiveError, load_run
 from coin.chipmap import MAX_SHOTS
 from coin.circuit import Circuit
 from coin.hardware import Transport, submit
 from coin.noise import model_from_calibration, predict_tails
+from coin.pool import POOL_ENV, EmptyPoolError, Pool
 from coin.sim import sample
 
 # The quantum coin: start at heads, |0⟩, apply H, measure.
@@ -40,9 +41,15 @@ def _parser() -> argparse.ArgumentParser:
     flip = commands.add_parser(
         "flip",
         help="flip the quantum coin",
-        description="Flip a quantum coin: H on |0⟩, then measure. Heads is 0, tails is 1.",
+        description="Flip a quantum coin. With --sim, H on |0⟩ then measure, simulated. "
+        "Without it, spend bits harvested from real hardware (`coin harvest`). "
+        "Heads is 0, tails is 1.",
     )
-    flip.add_argument("--sim", action="store_true", help="flip on the built-in simulator")
+    flip.add_argument(
+        "--sim",
+        action="store_true",
+        help="flip on the built-in simulator; without it, spend bits from the entropy pool",
+    )
     flip.add_argument(
         "--shots", type=_at_least(1), metavar="N", help="flip N times and print the counts"
     )
@@ -52,7 +59,46 @@ def _parser() -> argparse.ArgumentParser:
         metavar="S",
         help="seed the simulator's generator to replay a run",
     )
+    flip.add_argument("--pool", type=Path, metavar="DIR", help=f"the entropy pool (${POOL_ENV})")
     flip.set_defaults(handler=_flip)
+
+    pool = commands.add_parser(
+        "pool",
+        help="show the entropy pool",
+        description="Show each harvested batch in the entropy pool and how much of it is spent.",
+    )
+    pool.add_argument("--pool", type=Path, metavar="DIR", help=f"the entropy pool (${POOL_ENV})")
+    pool.set_defaults(handler=_pool)
+
+    harvest_ = commands.add_parser(
+        "harvest",
+        help="flip one qubit many times on IBM hardware and pool the extracted bits",
+        description="Run the coin on the qubit whose readout errs least, archive the raw run, "
+        "extract near-uniform bits by Toeplitz hashing, and add them to the entropy pool. "
+        "Needs QISKIT_IBM_TOKEN and QISKIT_IBM_INSTANCE. Spends QPU time only with --submit.",
+    )
+    harvest_.add_argument("--backend", metavar="NAME")
+    harvest_.add_argument("--shots", type=_at_least(1), metavar="N", help=f"at most {MAX_SHOTS:,}")
+    harvest_mode = harvest_.add_mutually_exclusive_group()
+    harvest_mode.add_argument(
+        "--dry-run", action="store_true", help="print the plan and its cost; submit nothing"
+    )
+    harvest_mode.add_argument(
+        "--submit", action="store_true", help="predict, submit, archive, extract and pool"
+    )
+    harvest_.add_argument(
+        "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
+    )
+    harvest_.add_argument(
+        "--pool", type=Path, metavar="DIR", help=f"the entropy pool (${POOL_ENV})"
+    )
+    harvest_mode.add_argument(
+        "--from-run",
+        type=Path,
+        metavar="DIR",
+        help="extract an already archived one-qubit run instead of running a new job",
+    )
+    harvest_.set_defaults(handler=_harvest)
 
     predict = commands.add_parser(
         "predict",
@@ -130,11 +176,9 @@ def _at_least(minimum: int) -> Callable[[str], int]:
 
 def _flip(args: argparse.Namespace) -> int:
     if not args.sim:
-        print(
-            "coin flip: single hardware flips arrive in v0.3; pass --sim to flip on the "
-            "simulator, or use `coin run chip-map` to flip every qubit of a backend",
-            file=sys.stderr,
-        )
+        return _flip_from_pool(args)
+    if args.pool is not None:
+        print("coin flip: --pool is for pool bits; it cannot go with --sim", file=sys.stderr)
         return 2
     rng = np.random.default_rng(args.seed)
     if args.shots is None:
@@ -147,6 +191,125 @@ def _flip(args: argparse.Namespace) -> int:
         n = counts.get(outcome, 0)
         print(f"{face}  {n:>{width},}  {n / args.shots:7.2%}")
     return 0
+
+
+def _flip_from_pool(args: argparse.Namespace) -> int:
+    if args.seed is not None:
+        print("coin flip: --seed replays the simulator; it needs --sim", file=sys.stderr)
+        return 2
+    try:
+        draws = Pool(args.pool).take(args.shots or 1)
+    except EmptyPoolError as error:
+        print(f"coin flip: {error}", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, KeyError) as error:
+        print(f"coin flip: the pool could not be read: {error!r}", file=sys.stderr)
+        return 1
+    bits = np.concatenate([d.bits for d in draws])
+    if args.shots is None:
+        print(FACES[str(bits[0])].upper())
+        return 0
+    width = len(f"{args.shots:,}")
+    for outcome, face in FACES.items():
+        n = int(np.count_nonzero(bits == int(outcome)))
+        print(f"{face}  {n:>{width},}  {n / args.shots:7.2%}")
+    return 0
+
+
+def _pool(args: argparse.Namespace) -> int:
+    try:
+        batches = Pool(args.pool).status()
+    except (OSError, ValueError, KeyError) as error:
+        print(f"coin pool: the pool could not be read: {error!r}", file=sys.stderr)
+        return 1
+    if not batches:
+        print("the pool is empty; run `coin harvest` to fill it")
+        return 0
+    print(f"{'batch':<34} {'qubit':>5} {'bits':>8} {'spent':>8} {'remaining':>10}")
+    for b in batches:
+        print(
+            f"{b.batch:<34} {b.provenance.get('qubit', '?'):>5} {b.total:>8,} {b.spent:>8,} "
+            f"{b.remaining:>10,}"
+        )
+    print(
+        f"{'total':<34} {'':>5} {sum(b.total for b in batches):>8,} "
+        f"{sum(b.spent for b in batches):>8,} {sum(b.remaining for b in batches):>10,}"
+    )
+    return 0
+
+
+def _harvest(args: argparse.Namespace) -> int:
+    if args.from_run is not None:
+        return _harvest_from_run(args)
+    return _harvest_new(args)
+
+
+def _harvest_from_run(args: argparse.Namespace) -> int:
+    try:
+        result = harvest.extract_run(args.from_run, Pool(args.pool))
+    except (OSError, ValueError, ArchiveError) as error:
+        print(f"coin harvest: {error}", file=sys.stderr)
+        return 1
+    _report_harvest(result)
+    return 0
+
+
+def _harvest_new(args: argparse.Namespace) -> int:  # noqa: PLR0911 - each return is one way out
+    pool = Pool(args.pool)
+    if args.backend is None or args.shots is None or not (args.dry_run or args.submit):
+        print(
+            "coin harvest: give --backend, --shots and one of --dry-run or --submit, "
+            "or --from-run DIR",
+            file=sys.stderr,
+        )
+        return 2
+    if args.shots > MAX_SHOTS:
+        print(f"coin harvest: at most {MAX_SHOTS:,} shots per job", file=sys.stderr)
+        return 2
+    try:
+        transport = _transport()
+        chosen = harvest.plan(args.backend, transport.calibration(args.backend), args.shots)
+        print(f"backend      {args.backend}")
+        print(f"qubit        {chosen.qubit}, the one whose calibrated readout errs least")
+        print(f"predicted    P(tails) = {chosen.p_tails:.4f}")
+        print(f"shots        {args.shots:,}, about {chosen.expected_bits:,} bits after extraction")
+        print(f"estimated    ~{chipmap.estimate_qpu_seconds(args.shots):.0f} QPU seconds")
+        if chosen.expected_bits < 1:
+            print("coin harvest: that would yield no bits; ask for more shots", file=sys.stderr)
+            return 1
+        if args.dry_run:
+            print("dry run: nothing submitted")
+            return 0
+        command = " ".join(
+            [
+                f"coin harvest --backend {args.backend} --shots {args.shots} --submit",
+                f"--runs-dir {args.runs_dir}",
+                *([f"--pool {args.pool}"] if args.pool is not None else []),
+            ]
+        )
+        result = harvest.harvest(transport, chosen, args.runs_dir, pool, submit_script=command)
+    except ImportError as error:
+        print(f"coin harvest: install the ibm extra ({error})", file=sys.stderr)
+        return 1
+    except (ValueError, RuntimeError, ArchiveError, OSError) as error:
+        print(f"coin harvest: {error}", file=sys.stderr)
+        return 1
+    _report_harvest(result)
+    return 0
+
+
+def _report_harvest(result: harvest.Harvest) -> None:
+    e = result.extraction
+    print(f"archived     {result.run_dir}")
+    print(
+        f"extracted    {len(e.bits):,} bits: min-entropy estimate {e.estimate:.4f} per shot, "
+        f"half spent (ε = {e.epsilon:.1e})"
+    )
+    print(f"pooled       batch {result.batch}")
+    print(
+        "note         the run's shots and the batch's seed determine every bit: commit the run "
+        "only once the batch is spent"
+    )
 
 
 def _predict(args: argparse.Namespace) -> int:

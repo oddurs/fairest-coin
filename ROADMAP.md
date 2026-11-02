@@ -50,13 +50,12 @@
 
 ## v0.3 — The fair coin
 
-`#####·····` 45% · 5 of 11 done · due 2026-12-06
+`######····` 55% · 6 of 11 done · due 2026-12-06
 
 `coin harvest` collects real hardware bits, debiases them, and fills a local pool;
 
 ### backlog
 
-- [ ] [`0032`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0032-harvest-hardware-bits-into-a-local-entropy-pool.md) Harvest hardware bits into a local entropy pool <sup>feature · p0 · extract</sup>
 - [ ] [`0033`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0033-print-a-receipt-with-every-flip.md) Print a receipt with every flip <sup>feature · p1 · cli</sup>
 - [ ] [`0034`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0034-draw-the-before-and-after-of-extraction.md) Draw the before-and-after of extraction <sup>feature · p2 · figures</sup>
 - [ ] [`0035`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0035-write-chapter-3-make-it-fair.md) Write chapter 3: make it fair <sup>docs · p0 · essay</sup>
@@ -69,6 +68,7 @@
 - [x] [`0029`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0029-mitigate-readout-error-on-estimated-distributions.md) Mitigate readout error on estimated distributions <sup>feature · p2 · extract</sup>
 - [x] [`0030`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0030-debias-bits-with-the-von-neumann-extractor.md) Debias bits with the von Neumann extractor <sup>feature · p0 · extract</sup>
 - [x] [`0031`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0031-build-a-randomness-test-battery-from-scratch.md) Build a randomness test battery from scratch <sup>feature · p0 · extract</sup>
+- [x] [`0032`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0032-harvest-hardware-bits-into-a-local-entropy-pool.md) Harvest hardware bits into a local entropy pool <sup>feature · p0 · extract</sup>
 - [x] [`0070`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0070-extract-with-toeplitz-hashing-from-a-min-entropy-estimate.md) Extract with Toeplitz hashing from a min-entropy estimate <sup>feature · p0 · extract</sup>
 
 ## v0.4 — The certified coin
