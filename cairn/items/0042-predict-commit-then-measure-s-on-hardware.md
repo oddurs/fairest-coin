@@ -24,12 +24,15 @@ public, before the run.
 
 ## Proposal
 
-`coin run chsh --backend NAME` computes the predicted S for the selected pair, writes it to
-`prediction.json`, and refuses to submit until that file is committed to git. Then it runs
-the design from the CHSH spike and archives the result.
+`coin run chsh --backend NAME` computes the predicted S for the selected pair, with an
+interval from the uncertainty of its inputs (measured readout, published two-qubit error),
+writes both to `prediction.json`, and refuses to submit until that file is committed to git.
+Then it runs the design from the CHSH spike and archives the result.
 
 ## Acceptance criteria
 
 - [ ] Submission refuses while the prediction is uncommitted, with a message saying so
-- [ ] Archived run reports S, its standard error, and σ above 2
+- [ ] The prediction states S and an interval, and the result says whether the measured S fell inside it
+- [ ] Archived run reports S, its standard error, and S_low at the stated ε
+- [ ] S is also reported for each half of the run, so drift during the job is visible
 - [ ] The prediction commit is an ancestor of the result commit in the git history

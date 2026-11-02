@@ -22,9 +22,11 @@ to know exactly which ones.
 ## Proposal
 
 `docs/chapters/06-what-it-would-really-take.md`: the locality, detection and
-freedom-of-choice loopholes; the 2015 loophole-free experiments; what device-independent
-randomness requires; and which of those conditions this project meets and which it does
-not.
+freedom-of-choice loopholes (here the settings are uploaded with the job, so the device
+could see them); the assumption that rounds are independent and alike, against the drift
+this chip showed; the 2015 loophole-free experiments; what device-independent randomness and
+randomness expansion require; and which of those conditions this project meets and which it
+does not.
 
 ## Acceptance criteria
 

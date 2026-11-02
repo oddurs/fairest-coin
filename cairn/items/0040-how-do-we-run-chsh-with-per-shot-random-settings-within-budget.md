@@ -25,10 +25,18 @@ many shots do we need for S > 2 at 5σ, given the fidelity we predict for the be
 Per-shot settings chosen by our own coin are what make the bootstrap honest, and the
 naive implementation would spend the whole allowance on job overhead.
 
+It also has to interleave the four setting pairs through the job, so that drift (spike 0028
+found qubits that change within seconds) affects every correlator alike rather than biasing
+whichever setting ran last.
+
 ## Options
 
 - One parametrised circuit, with all settings as one parameter array in a single Sampler call
 - Four fixed-setting circuits, with the settings sequence applied afterwards (weaker: settings are not chosen per shot before measurement)
+
+Either way the settings are in the job before it runs, so the device could in principle see
+them: a freedom-of-choice loophole this project cannot close, to be named in chapter 5 and
+the epilogue.
 
 ## What would settle it
 

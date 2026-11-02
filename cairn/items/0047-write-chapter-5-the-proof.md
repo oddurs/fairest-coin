@@ -30,4 +30,5 @@ with its accounting.
 
 - [ ] Links the prediction commit and the result run
 - [ ] States what this does *not* prove, deferring the full account to the epilogue
+- [ ] Names the assumptions the certified bits rest on: independent rounds (with the run's own drift check as evidence), settings in the job before it runs, one chip, and no randomness expansion
 - [ ] Linked from the README's chapter index

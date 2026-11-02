@@ -22,12 +22,15 @@ pair is routing in miniature.
 
 ## Proposal
 
-`select_pair(calibration, coupling_map)` scores every coupled pair by predicted Bell
+`select_pair(calibration, readout, coupling_map)` scores every coupled pair by predicted Bell
 fidelity from the noise model (two-qubit gate error plus both readout errors) and returns
-the best, with the score.
+the best, with the score. The readout comes from `coin run readout` in the same session,
+not from the published calibration: spike 0069 found published p(1|0) correlates only
++0.46 with measured, and that readout breaks transiently (qubit 59: 75% for a while).
 
 ## Acceptance criteria
 
 - [ ] On a calibration fixture, returns the pair a brute-force density simulation ranks first
 - [ ] Only coupled pairs are ever considered
+- [ ] Readout errors come from readout runs (`readout.measured`), with the published values used only where a qubit was not measured, and the source of each is reported
 - [ ] `coin predict --pairs` lists the top 5 pairs with predicted fidelity

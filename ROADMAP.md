@@ -21,13 +21,12 @@
 
 ## v0.3.1 — Hardening
 
-`#########·` 82% · 9 of 11 done · due 2026-11-09
+`##########` 91% · 10 of 11 done · due 2026-11-09
 
 v0.3.1: every defect found by the review of the first three milestones is fixed, the essay
 
 ### backlog
 
-- [ ] [`0084`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0084-rebuild-the-v0-4-plan-on-what-v0-2-and-v0-3-found.md) Rebuild the v0.4 plan on what v0.2 and v0.3 found <sup>chore · p0 · chsh</sup>
 - [ ] [`0085`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0085-cut-v0-3-1.md) Cut v0.3.1 <sup>chore · p0 · tooling</sup>
 
 ### done
@@ -41,6 +40,7 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 - [x] [`0081`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0081-close-the-four-test-gaps-the-review-s-mutants-found.md) Close the four test gaps the review's mutants found <sup>chore · p2 · tooling</sup>
 - [x] [`0082`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0082-bring-the-essay-up-to-date-with-what-v0-3-found.md) Bring the essay up to date with what v0.3 found <sup>docs · p1 · essay</sup>
 - [x] [`0083`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0083-leave-room-for-the-squash-suffix-in-commit-subjects.md) Leave room for the squash suffix in commit subjects <sup>chore · p3 · tooling</sup>
+- [x] [`0084`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0084-rebuild-the-v0-4-plan-on-what-v0-2-and-v0-3-found.md) Rebuild the v0.4 plan on what v0.2 and v0.3 found <sup>chore · p0 · chsh</sup>
 
 ## v0.2 — The real coin
 
@@ -95,7 +95,7 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 
 ## v0.4 — The certified coin
 
-`··········` 0% · 0 of 12 done · due 2026-12-27
+`··········` 0% · 0 of 13 done · due 2026-12-27
 
 A Bell test run on real hardware, with the measurement settings chosen by the v0.3 coin,
 
@@ -113,6 +113,7 @@ A Bell test run on real hardware, with the measurement settings chosen by the v0
 - [ ] [`0046`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0046-write-chapter-4-two-coins-that-agree.md) Write chapter 4: two coins that agree <sup>docs · p0 · essay</sup>
 - [ ] [`0047`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0047-write-chapter-5-the-proof.md) Write chapter 5: the proof <sup>docs · p0 · essay</sup>
 - [ ] [`0048`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0048-cut-v0-4-0.md) Cut v0.4.0 <sup>chore · p0 · tooling</sup>
+- [ ] [`0066`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0066-move-the-ibm-adapter-to-the-client-side-executor-sampler.md) Move the IBM adapter to the client-side executor Sampler <sup>chore · p1 · hardware</sup>
 
 ## v1.0 — The promise
 
@@ -131,7 +132,7 @@ The whole essay, from "your coin is unfair" to "what it would really take", wher
 
 ## later — Good ideas off the path
 
-`··········` 0% · 0 of 8 done
+`··········` 0% · 0 of 6 done
 
 Nothing on a schedule. Ideas that are good but not on the road to v1.0 land here instead
 
@@ -140,9 +141,7 @@ Nothing on a schedule. Ideas that are good but not on the road to v1.0 land here
 - [ ] [`0055`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0055-publish-to-pypi-with-trusted-publishing.md) Publish to PyPI with trusted publishing <sup>feature · p3 · tooling</sup>
 - [ ] [`0056`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0056-render-the-essay-as-a-static-site.md) Render the essay as a static site <sup>feature · p3 · essay</sup>
 - [ ] [`0057`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0057-port-the-simulator-to-rust.md) Port the simulator to Rust <sup>feature · p3 · sim</sup>
-- [ ] [`0058`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0058-add-a-toeplitz-hashing-extractor.md) Add a Toeplitz-hashing extractor <sup>feature · p3 · extract</sup>
 - [ ] [`0059`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0059-implement-a-two-party-quantum-coin-flipping-protocol.md) Implement a two-party quantum coin-flipping protocol <sup>feature · p3 · chsh</sup>
 - [ ] [`0060`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0060-compare-coins-across-ibm-processor-generations.md) Compare coins across IBM processor generations <sup>feature · p3 · hardware</sup>
-- [ ] [`0066`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0066-move-the-ibm-adapter-to-the-client-side-executor-sampler.md) Move the IBM adapter to the client-side executor Sampler <sup>chore · p2 · hardware</sup>
 - [ ] [`0071`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0071-tighten-the-min-entropy-estimate-for-hidden-state-sources.md) Tighten the min-entropy estimate for hidden-state sources <sup>feature · p3 · extract</sup>
 

@@ -21,8 +21,8 @@ The over-the-top payoff is a coin flip that carries a Bell-violation certificate
 
 ## Proposal
 
-Receipts for bits from certified batches add S, its σ above 2, and the batch that supplied
-the settings.
+Receipts for bits from certified batches add S, S_low with its ε, the certified min-entropy
+per round, and the batch that supplied the settings.
 
 ## Acceptance criteria
 
