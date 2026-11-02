@@ -92,7 +92,7 @@ class Run:
 
     @property
     def qpu_seconds(self) -> float | None:
-        """The QPU time charged, preferring the final usage record over the one at result time."""
+        """The QPU time charged: the usage record's charge, else meta.json's quantum_seconds."""
         if self.usage is not None and self.usage.get("qpu_charge_time_seconds") is not None:
             return self.usage["qpu_charge_time_seconds"]
         return self.quantum_seconds

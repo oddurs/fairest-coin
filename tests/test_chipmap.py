@@ -1,6 +1,6 @@
 import json
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -46,7 +46,14 @@ class FakeTransport:
     def calibration(self, backend: str) -> dict[str, Any]:
         return self._calibration
 
-    def run(self, backend: str, qasm: str, layout: Sequence[int], shots: int) -> JobResult:
+    def run(
+        self,
+        backend: str,
+        qasm: str,
+        layout: Sequence[int],
+        shots: int,
+        on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+    ) -> JobResult:
         self.runs.append((backend, shots))
         bits = np.random.default_rng(0).random((shots, len(layout))) < self._p
         memory = tuple("".join("1" if b else "0" for b in row[::-1]) for row in bits)

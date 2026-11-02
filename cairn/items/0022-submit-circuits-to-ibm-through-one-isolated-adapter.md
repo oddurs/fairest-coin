@@ -11,7 +11,7 @@ depends_on:
 - 19
 - 20
 created: 2026-11-01
-updated: 2026-11-01
+updated: 2026-11-02
 closed_at: 2026-11-01
 priority: p0
 effort: m
@@ -49,3 +49,7 @@ coin.hardware (no Qiskit): Submission(circuit native, backend, layout, shots, ca
 ## 2026-11-01
 
 Independent review found two bugs, both fixed with tests that failed first: (1) routing slipped past the mapping check, because swaps are built from native gates and only gate names were compared; the check now compares every instruction, its angles and its physical qubits, in order. (2) A failure after the job ran lost the shots and the job id; submit now checks archivability (JSON, writable runs_dir) before submitting, saves a .unarchived-<job>.json and names the job if archiving fails, and every transport error after submission names the job. Errors are raised outside the except block so the unscrubbed original is neither cause nor context. A full run now executes offline against a local GenericBackendV2.
+
+## 2026-11-02
+
+Correction (review of v0.1–v0.3): criterion 'a finished job's QPU seconds are recorded in meta.json' held only against the fake transport. On hardware the adapter read a field IBM's usage record lacks, so meta.json's quantum_seconds is null in all six archived runs (Run.qpu_seconds still reports them from usage.json). Fixed for new runs in 0075.

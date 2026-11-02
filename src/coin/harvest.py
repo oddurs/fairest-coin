@@ -136,7 +136,12 @@ def harvest(
             f"bits, under the {MIN_HARVEST_BITS:,} worth a harvest; ask for more"
         )
     pool.require_writable()
-    run_dir = submit(transport, chosen.submission, runs_dir, submit_script=submit_script)
+    try:
+        run_dir = submit(transport, chosen.submission, runs_dir, submit_script=submit_script)
+    except BaseException as error:
+        if getattr(error, "__notes__", None):
+            error.add_note("Then `coin harvest --from-run <its run directory>` pools its bits.")
+        raise
     try:
         return extract_run(run_dir, pool)
     # The QPU time is spent and the run is safe in the archive: whatever went wrong after

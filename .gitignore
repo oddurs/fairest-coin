@@ -23,3 +23,6 @@ build/
 
 # Hypothesis keeps a local database of examples it has tried
 .hypothesis/
+
+# A job submitted but not yet archived: local recovery state for `coin recover`.
+data/runs/.pending-*

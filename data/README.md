@@ -28,7 +28,7 @@ One directory per job: `runs/<UTC date of submission>-<job id>/`, for example
 | `memory.txt` or `memory.txt.gz` | no | the outcome of every shot, in order |
 | `prediction-dryrun.json` | no | the forecast from a rehearsal that submitted nothing |
 | `submit.py` | no | the exact script that produced the run |
-| `usage.json` | no | the final QPU usage, fetched after the job finished |
+| `usage.json` | no | IBM's usage record as it stood when the result arrived; may still say `pending` |
 | `extraction.json` | no | for a harvest, how its batch was extracted, added once the batch is spent |
 
 All JSON is UTF-8, indented by two spaces, keys sorted, with a trailing newline.
@@ -93,10 +93,11 @@ outcomes tally exactly to `counts.json`.
 
 ### `usage.json`
 
-The final usage record, fetched once IBM marks it complete. `Run.qpu_seconds` takes
-`qpu_charge_time_seconds` from here when present, and falls back to `meta.json`'s
-`quantum_seconds`. The first run shows why: at result time its usage still read
-`pending` and `quantum_seconds` was null.
+IBM's usage record as it stood when the result arrived. Its `status` may still be
+`pending`; the charge it shows (`qpu_charge_time_seconds`) is the one the job was billed in
+every run so far. Runs archived before v0.3.1 have `quantum_seconds: null` in `meta.json`,
+because the adapter read a field the record does not have; `Run.qpu_seconds` reads the charge
+from here instead, so those runs still report their QPU time.
 
 ### `extraction.json`
 
@@ -114,3 +115,28 @@ It holds the batch's provenance as the pool recorded it:
 - `added_at`, and `spent_before_publishing`.
 
 `coin.extract.toeplitz` of the run's shots with that seed reproduces the batch bit for bit.
+
+## Jobs that never finished archiving
+
+Before anything is submitted, `coin.hardware.submit` writes a pending record,
+`runs/.pending-<id>.json`. It holds the plan, the circuit, the calibration and the
+prediction, and the process that submitted it.
+
+As soon as IBM assigns an id, the record gets it, along with what ran (gate counts and
+sampler options) and when. If archiving fails, the result goes into the record too; if even
+that write fails, a copy goes to the temp directory, where recovery also looks.
+
+If a run is cut short after IBM has the job (a timeout, a dropped connection, Ctrl-C, a
+closed terminal), recover it with `coin recover`:
+
+- `coin recover` lists what is waiting.
+- `coin recover JOB_ID` archives the job with the prediction it was given before it ran.
+  It leaves a job alone while the process that submitted it still holds the record's lock
+  (it is still waiting on the job), unless `--force`. A job already in the archive is never archived twice; its leftover records are
+  removed.
+- `--record FILE` names the record for a job whose id never reached it. Find the id on
+  IBM's dashboard.
+- `--discard FILE` removes a record for a job that never ran. A record that names a job, or
+  holds its shots, is refused unless `--force`: it is the only copy of that job's prediction.
+
+Pending records are local state and are not committed.

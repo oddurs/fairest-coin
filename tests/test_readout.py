@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -35,7 +35,14 @@ class FakeTransport:
     def calibration(self, backend: str) -> dict[str, Any]:
         return self._calibration
 
-    def run(self, backend: str, qasm: str, layout: Sequence[int], shots: int) -> JobResult:
+    def run(
+        self,
+        backend: str,
+        qasm: str,
+        layout: Sequence[int],
+        shots: int,
+        on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+    ) -> JobResult:
         self.runs.append(shots)
         bits = np.random.default_rng(2).random((shots, len(layout))) < self._p
         now = datetime.now(UTC)
