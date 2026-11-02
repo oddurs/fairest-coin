@@ -5,14 +5,14 @@ title: Find out why the chip-map prediction missed
 type: spike
 status: backlog
 milestone: v0.3
+depends_on:
+- 23
 created: 2026-11-01
 updated: 2026-11-01
 priority: p1
 effort: s
 area: noise
 qpu: true
-depends_on:
-- 23
 ---
 
 ## Question
@@ -47,3 +47,7 @@ the coin a second time in the same job to separate drift from bias. Estimate the
 ## Answer
 
 <!-- Filled in when the spike closes. A spike closed without an answer was wasted. -->
+
+## 2026-11-01
+
+A later calibration (owner's dry run, 2026-11-02 ~02:53 UTC, not archived) newly flags qubits 34, 48 and 59 as readout-broken: p(1|0) = 0.56, 0.65 and 0.75. In the chip-map run they came up tails 65.2%, 64.9% and 79.8%, among the worst misses. So for these three the miss was most likely readout that went bad before the calibration caught it, not state preparation. The spike's prepare-|0⟩ circuit tests exactly this; archive a fresh calibration with it.
