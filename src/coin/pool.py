@@ -227,3 +227,31 @@ def _sync(descriptor: int) -> None:
         except OSError:
             pass  # the filesystem does not support it; fsync below still applies
     os.fsync(descriptor)
+
+
+def receipt(draw: Draw, flipped_at: datetime) -> dict[str, Any]:
+    """Where one flip came from, for `coin flip`: the run, the qubit, the extraction.
+
+    The fields are documented in docs/receipt.schema.json. With the archived run, `run`
+    and the batch's recorded seed recompute the bit.
+    """
+    if len(draw.bits) != 1:
+        raise ValueError(f"a receipt is for one flip, got {len(draw.bits)} bits")
+    bit = int(draw.bits[0])
+    p = draw.provenance
+    return {
+        "outcome": "TAILS" if bit else "HEADS",
+        "bit": bit,
+        "flipped_at": flipped_at.isoformat(),
+        "backend": p.get("backend"),
+        "qubit": p.get("qubit"),
+        "job_id": p.get("job_id"),
+        "run": p.get("run"),
+        "harvested_at": p.get("added_at"),
+        "batch": draw.batch,
+        "offset": draw.offset,
+        "batch_bits": p.get("bits"),
+        "extractor": "toeplitz",
+        "entropy_per_bit": p.get("entropy_per_bit"),
+        "epsilon": p.get("epsilon"),
+    }
