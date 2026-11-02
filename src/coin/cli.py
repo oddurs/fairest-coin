@@ -4,6 +4,8 @@ import argparse
 import gzip
 import json
 import math
+import os
+import subprocess
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -109,38 +111,7 @@ def _parser() -> argparse.ArgumentParser:
     compare.add_argument("run_dir", type=Path, metavar="RUN", help="an archived run directory")
     compare.set_defaults(handler=_compare)
 
-    recover = commands.add_parser(
-        "recover",
-        help="archive a hardware job whose run was cut short",
-        description="Archive a job that IBM accepted but whose run did not finish archiving "
-        "(the wait timed out, the connection dropped, or it was interrupted), from the pending "
-        "record written before it was submitted. Fetches the result from IBM if the record "
-        "does not already hold it; needs QISKIT_IBM_TOKEN and QISKIT_IBM_INSTANCE then.",
-    )
-    recover.add_argument(
-        "job_id", metavar="JOB_ID", nargs="?", help="the job to archive; omit to list"
-    )
-    recover.add_argument(
-        "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
-    )
-    recover.add_argument(
-        "--record",
-        type=Path,
-        metavar="FILE",
-        help="the pending record to use, for a job whose id was never recorded",
-    )
-    recover.add_argument(
-        "--force",
-        action="store_true",
-        help="recover a job its submitter still holds, or discard a record that names a job",
-    )
-    recover.add_argument(
-        "--discard",
-        type=Path,
-        metavar="FILE",
-        help="remove a pending record for a job that never ran",
-    )
-    recover.set_defaults(handler=_recover)
+    _add_archive_commands(commands)
 
     run = commands.add_parser("run", help="run an experiment on real IBM hardware")
     experiments = run.add_subparsers(dest="experiment", required=True, metavar="EXPERIMENT")
@@ -197,6 +168,53 @@ def _parser() -> argparse.ArgumentParser:
     )
     readout_.set_defaults(handler=_readout)
     return parser
+
+
+def _add_archive_commands(commands: Any) -> None:
+    """`coin publish` and `coin recover`: looking after what is already in the archive."""
+    publish = commands.add_parser(
+        "publish",
+        help="write a spent harvest's extraction record into its archived run",
+        description="Once a harvest's pool batch is spent, write the batch's provenance (its "
+        "seed included) into the run's directory as extraction.json, so that every flip it "
+        "gave can be recomputed from the archive. Refused while any bit is unspent.",
+    )
+    publish.add_argument("run_dir", type=Path, metavar="RUN", help="the archived harvest run")
+    publish.add_argument("--pool", type=Path, metavar="DIR", help=f"the entropy pool (${POOL_ENV})")
+    publish.set_defaults(handler=_publish)
+
+    recover = commands.add_parser(
+        "recover",
+        help="archive a hardware job whose run was cut short",
+        description="Archive a job that IBM accepted but whose run did not finish archiving "
+        "(the wait timed out, the connection dropped, or it was interrupted), from the pending "
+        "record written before it was submitted. Fetches the result from IBM if the record "
+        "does not already hold it; needs QISKIT_IBM_TOKEN and QISKIT_IBM_INSTANCE then.",
+    )
+    recover.add_argument(
+        "job_id", metavar="JOB_ID", nargs="?", help="the job to archive; omit to list"
+    )
+    recover.add_argument(
+        "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
+    )
+    recover.add_argument(
+        "--record",
+        type=Path,
+        metavar="FILE",
+        help="the pending record to use, for a job whose id was never recorded",
+    )
+    recover.add_argument(
+        "--force",
+        action="store_true",
+        help="recover a job its submitter still holds, or discard a record that names a job",
+    )
+    recover.add_argument(
+        "--discard",
+        type=Path,
+        metavar="FILE",
+        help="remove a pending record for a job that never ran",
+    )
+    recover.set_defaults(handler=_recover)
 
 
 def _add_flip(commands: Any) -> None:
@@ -342,7 +360,33 @@ def _harvest(args: argparse.Namespace) -> int:
     return _harvest_new(args)
 
 
+def _tracked_by_git(path: Path) -> bool:
+    """Whether git tracks anything in `path`: if so its shots are, or will be, public."""
+    # Git's own variables (set, for one, while a hook runs) would point it at another
+    # repository than the one `path` is in; let it find the right one from `path`.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    try:
+        listed = subprocess.run(
+            ["git", "ls-files", "--", str(path)],
+            cwd=path if path.is_dir() else path.parent,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+    except OSError:  # no git on this machine: nothing it could have published
+        return False
+    return listed.returncode == 0 and bool(listed.stdout.strip())
+
+
 def _harvest_from_run(args: argparse.Namespace) -> int:
+    if _tracked_by_git(args.from_run):
+        print(
+            f"coin harvest: {args.from_run} is tracked by git, so its shots are public and its "
+            "bits would be predictable; harvest a run that has not been committed",
+            file=sys.stderr,
+        )
+        return 1
     try:
         result = harvest.extract_run(args.from_run, Pool(args.pool))
     except (OSError, ValueError, ArchiveError) as error:
@@ -469,6 +513,17 @@ def _transport() -> Transport:
 def _explain(error: BaseException) -> str:
     """An error and its notes: `submit` notes how to recover a job it could not archive."""
     return "\n".join([str(error), *getattr(error, "__notes__", [])])
+
+
+def _publish(args: argparse.Namespace) -> int:
+    try:
+        written = harvest.publish(args.run_dir, Pool(args.pool))
+    except (OSError, ValueError, ArchiveError) as error:
+        print(f"coin publish: {_explain(error)}", file=sys.stderr)
+        return 1
+    print(f"published    {written}")
+    print("note         commit the run with this file: every flip it gave can now be checked")
+    return 0
 
 
 def _recover(args: argparse.Namespace) -> int:

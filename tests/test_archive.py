@@ -296,3 +296,16 @@ def test_a_whole_chip_run_stays_small(tmp_path: Path) -> None:
     size = sum(path.stat().st_size for path in directory.iterdir())
     assert size < 6_000_000, f"{size / 1e6:.1f} MB"
     assert load_run(directory) == run
+
+
+def test_a_record_added_later_is_written_whole_and_only_once(tmp_path: Path) -> None:
+    run = tmp_path / FIRST_RUN.name
+    shutil.copytree(FIRST_RUN, run)
+    path = archive.add_record(run, archive.EXTRACTION, {"bits": 3})
+    assert path.read_text() == '{\n  "bits": 3\n}\n'
+    assert not list(run.glob(".*.tmp"))
+    with pytest.raises(archive.ArchiveError, match="already exists"):
+        archive.add_record(run, archive.EXTRACTION, {"bits": 4})
+    with pytest.raises(archive.ArchiveError, match="not a record"):
+        archive.add_record(run, archive.META, {})
+    assert archive.load_run(run).job_id  # the run itself is untouched and still loads

@@ -130,11 +130,11 @@ def test_the_pool_lives_where_the_environment_says(
     assert default_path() == tmp_path / "data" / "fairest-coin" / "pool"
 
 
-def test_the_same_run_cannot_be_pooled_twice(tmp_path: Path) -> None:
+def test_the_same_job_cannot_be_pooled_twice_whatever_its_directory(tmp_path: Path) -> None:
     pool = Pool(tmp_path)
-    pool.add([1, 0], {"run": "2026-11-02-abc"}, label="abc")
-    with pytest.raises(ValueError, match="already pooled"):
-        pool.add([0, 1], {"run": "2026-11-02-abc"}, label="abc")
+    pool.add([1, 0], {"run": "2026-11-02-abc", "job_id": "abc"}, label="abc")
+    with pytest.raises(ValueError, match="job abc is already pooled"):
+        pool.add([0, 1], {"run": "a-copy-of-it", "job_id": "abc"}, label="abc")
 
 
 def test_batches_added_in_the_same_second_come_out_oldest_first(tmp_path: Path) -> None:
@@ -196,3 +196,10 @@ def test_taking_from_a_pool_that_does_not_exist_creates_nothing(tmp_path: Path) 
     with pytest.raises(EmptyPoolError):
         Pool(tmp_path / "never").take(1)
     assert not (tmp_path / "never").exists()
+
+
+def test_a_batch_with_no_job_id_falls_back_to_its_run(tmp_path: Path) -> None:
+    pool = Pool(tmp_path)
+    pool.add([1, 0], {"run": "2026-11-02-abc"}, label="abc")
+    with pytest.raises(ValueError, match="run 2026-11-02-abc is already pooled"):
+        pool.add([0, 1], {"run": "2026-11-02-abc"}, label="abc")

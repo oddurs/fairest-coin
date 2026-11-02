@@ -100,11 +100,14 @@ class Pool:
                 raise ValueError(f"batch {batch} already exists")
             # The same shots extracted twice, even with fresh seeds, are not twice the
             # entropy: the second batch would be spending the first one's margin.
-            source = provenance.get("run")
-            if source is not None:
-                for name, existing in self._provenances().items():
-                    if existing.get("run") == source:
-                        raise ValueError(f"run {source} is already pooled, as batch {name}")
+            # Keyed on the job, not the directory: a copied or renamed run is the same shots.
+            # A provenance with no job id falls back to the run's name.
+            job, run = provenance.get("job_id"), provenance.get("run")
+            for name, existing in self._provenances().items():
+                if job is not None and existing.get("job_id") == job:
+                    raise ValueError(f"job {job} is already pooled, as batch {name}")
+                if job is None and run is not None and existing.get("run") == run:
+                    raise ValueError(f"run {run} is already pooled, as batch {name}")
             # Bits and provenance first, both atomically; a batch exists once its .bits does.
             _write_atomic(self.path / f"{batch}.json", json.dumps(record, indent=2).encode())
             _write_atomic(self.path / f"{batch}.bits", np.packbits(x).tobytes())
