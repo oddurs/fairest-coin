@@ -11,7 +11,7 @@ from typing import Any
 
 import numpy as np
 
-from coin import __version__, chipmap, harvest
+from coin import __version__, chipmap, harvest, readout
 from coin.archive import ArchiveError, load_run
 from coin.chipmap import MAX_SHOTS
 from coin.circuit import Circuit
@@ -158,6 +158,32 @@ def _parser() -> argparse.ArgumentParser:
         "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
     )
     chip_map.set_defaults(handler=_chip_map)
+
+    readout_ = experiments.add_parser(
+        "readout",
+        help="prepare |0⟩ or |1⟩ on every qubit and measure: the readout as a job sees it",
+        description="Prepare |0⟩ (or |1⟩ with --prepare 1) on every qubit of a backend and "
+        "measure them all at once, predicted first from the published readout error. "
+        "Needs QISKIT_IBM_TOKEN and QISKIT_IBM_INSTANCE. Spends QPU time only with --submit.",
+    )
+    readout_.add_argument("--backend", required=True, metavar="NAME")
+    readout_.add_argument(
+        "--shots", type=_at_least(1), required=True, metavar="N", help=f"at most {MAX_SHOTS:,}"
+    )
+    readout_.add_argument(
+        "--prepare", type=int, choices=(0, 1), required=True, help="the state to prepare"
+    )
+    readout_mode = readout_.add_mutually_exclusive_group(required=True)
+    readout_mode.add_argument(
+        "--dry-run", action="store_true", help="print the plan and its cost; submit nothing"
+    )
+    readout_mode.add_argument(
+        "--submit", action="store_true", help="predict, then submit and archive the job"
+    )
+    readout_.add_argument(
+        "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
+    )
+    readout_.set_defaults(handler=_readout)
     return parser
 
 
@@ -353,6 +379,37 @@ def _transport() -> Transport:
     return IBMTransport()
 
 
+def _readout(args: argparse.Namespace) -> int:
+    if args.shots > MAX_SHOTS:
+        print(f"coin run readout: at most {MAX_SHOTS:,} shots per job", file=sys.stderr)
+        return 2
+    try:
+        transport = _transport()
+        chosen = readout.plan(
+            args.backend, transport.calibration(args.backend), args.shots, args.prepare
+        )
+        print(readout.summary(chosen))
+        print(f"estimated    ~{chipmap.estimate_qpu_seconds(args.shots):.0f} QPU seconds")
+        if args.dry_run:
+            print("dry run: nothing submitted")
+            return 0
+        command = (
+            f"coin run readout --backend {args.backend} --shots {args.shots} "
+            f"--prepare {args.prepare} --submit --runs-dir {args.runs_dir}"
+        )
+        directory = submit(transport, chosen.submission, args.runs_dir, submit_script=command)
+        hits, total = readout.within_three_sigma(load_run(directory))
+    except ImportError as error:
+        print(f"coin run: install the ibm extra ({error})", file=sys.stderr)
+        return 1
+    except (ValueError, RuntimeError, ArchiveError) as error:
+        print(f"coin run readout: {error}", file=sys.stderr)
+        return 1
+    print(f"archived     {directory}")
+    print(f"published    {hits} of {total} qubits read within 3σ of their published error")  # noqa: RUF001 - σ is the display text
+    return 0
+
+
 def _chip_map(args: argparse.Namespace) -> int:
     if args.shots > MAX_SHOTS:
         print(f"coin run chip-map: at most {MAX_SHOTS:,} shots per job", file=sys.stderr)
@@ -380,7 +437,7 @@ def _chip_map(args: argparse.Namespace) -> int:
         ("alternative", chip.p_tails_measurement_decay),
     ):
         within = sum(
-            abs(tails[q] / run.shots - p) <= 3 * math.sqrt(p * (1 - p) / run.shots)
+            chipmap.within_three_sigma(tails[q] / run.shots, p, run.shots)
             for q, p in predicted.items()
         )
         print(f"{label:12} {within} of {len(predicted)} qubits within 3σ of the prediction")  # noqa: RUF001 - σ is the display text

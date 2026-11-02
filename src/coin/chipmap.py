@@ -123,6 +123,15 @@ class QubitResult:
         return (self.measured - self.predicted) / self.sigma
 
 
+def within_three_sigma(measured: float, predicted: float, shots: int) -> bool:
+    """Whether a measured fraction is within 3σ of a predicted probability over `shots`.
+
+    σ is the prediction's own binomial spread, so a prediction of exactly 0 or 1 claims that
+    nothing else can happen, and any other outcome misses it.
+    """
+    return abs(measured - predicted) <= 3 * math.sqrt(predicted * (1 - predicted) / shots)
+
+
 def compare(run: Run) -> list[QubitResult]:
     """Every predicted qubit of an archived chip map against what it measured, by qubit."""
     # A single-qubit run's p_tails is one number; a chip map's is one per qubit.
@@ -154,8 +163,7 @@ def report(run: Run) -> str:
 
     def within_3_sigma(predicted: list[float], rows: list[QubitResult]) -> int:
         return sum(
-            abs(r.measured - p) <= 3 * math.sqrt(p * (1 - p) / r.shots)
-            for r, p in zip(rows, predicted, strict=True)
+            within_three_sigma(r.measured, p, r.shots) for r, p in zip(rows, predicted, strict=True)
         )
 
     model_p = [r.predicted for r in results]
