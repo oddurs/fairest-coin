@@ -3,10 +3,12 @@ id: 76
 uid: ce25fd4f-05ec-47c3-b011-546f0fc16cfe
 title: Scrub encoded credentials and check classical bits in the IBM adapter
 type: bug
-status: backlog
+status: done
 milestone: v0.3.1
+assignee: Oddur Sigurdsson
 created: 2026-11-02
 updated: 2026-11-02
+closed_at: 2026-11-02
 priority: p2
 effort: s
 area: hardware
@@ -21,5 +23,9 @@ would go unnoticed.
 
 ## Acceptance criteria
 
-- [ ] URL-encoded (and percent-encoded twice) forms of the token and instance are scrubbed (test)
-- [ ] A circuit whose measurements land in different classical bits is refused as changed (test)
+- [x] URL-encoded (and percent-encoded twice) forms of the token and instance are scrubbed (test)
+- [x] A circuit whose measurements land in different classical bits is refused as changed (test)
+
+## Result
+
+The adapter scrubs the token and instance verbatim, percent-encoded once and twice (either hex case) and form-encoded; the circuit-change check compares classical bits as well as gates, angles and physical qubits.

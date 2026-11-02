@@ -19,6 +19,7 @@ import os
 from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote, quote_plus
 
 from qiskit import qasm3, transpile
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
@@ -184,7 +185,12 @@ class IBMTransport:
         raise IBMError(failure, job_id=job_id)
 
     def _scrub(self, text: str) -> str:
-        return text.replace(self._token, f"<{TOKEN}>").replace(self._instance, f"<{INSTANCE}>")
+        # An error can echo a credential as it appeared in a URL: percent-encoded once or
+        # twice, or form-encoded. The instance CRN holds ':' and '/', so it is rarely verbatim.
+        for secret, name in ((self._token, TOKEN), (self._instance, INSTANCE)):
+            for form in sorted(_encodings(secret), key=len, reverse=True):
+                text = text.replace(form, f"<{name}>")
+        return text
 
 
 # Off explicitly: either would change the circuit that actually runs on the qubits.
@@ -222,16 +228,29 @@ def _plain(options: Any) -> dict[str, Any]:
     return json.loads(json.dumps(options.__dict__, default=encode))
 
 
+def _encodings(secret: str) -> set[str]:
+    """The forms a secret takes in URLs and their echoes: verbatim, percent-encoded once and
+    twice (either case of hex digit), and form-encoded."""
+    once = quote(secret, safe="")
+    forms = {secret, once, quote(once, safe=""), quote_plus(secret)}
+    return forms | {form.lower() for form in forms if "%" in form}
+
+
 def _instructions(
     circuit: Any, physical: list[int]
-) -> list[tuple[str, tuple[float, ...], tuple[int, ...]]]:
-    """Each instruction as (name, angles, physical qubits); barriers carry no physics."""
+) -> list[tuple[str, tuple[float, ...], tuple[int, ...], tuple[int, ...]]]:
+    """Each instruction as (name, angles, physical qubits, classical bits).
+
+    Barriers carry no physics. The classical bits matter: a measurement that landed in
+    another bit would put one qubit's outcome under another's name.
+    """
     found = []
     for instruction in circuit.data:
         name = instruction.operation.name
         if name == "barrier":
             continue
         qubits = tuple(physical[circuit.find_bit(q).index] for q in instruction.qubits)
+        clbits = tuple(circuit.find_bit(c).index for c in instruction.clbits)
         angles = tuple(round(float(p), 12) for p in instruction.operation.params)
-        found.append((name, angles, qubits))
+        found.append((name, angles, qubits, clbits))
     return found

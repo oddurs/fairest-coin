@@ -2,6 +2,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote, quote_plus
 
 import pytest
 from qiskit.providers.fake_provider import GenericBackendV2
@@ -322,3 +323,49 @@ def test_a_failure_while_fetching_is_not_sent_back_to_recover(credentials: None)
     assert message.startswith("fetching job gone-1")
     assert "coin recover" not in message
     assert TOKEN not in message
+
+
+@pytest.mark.parametrize(
+    "encode",
+    [
+        lambda s: quote(s, safe=""),
+        lambda s: quote(quote(s, safe=""), safe=""),
+        lambda s: quote(s, safe="").lower(),
+        quote_plus,
+    ],
+    ids=["percent", "percent-twice", "lowercase-hex", "form"],
+)
+def test_encoded_credentials_are_scrubbed_too(credentials: None, encode: Any) -> None:
+    # A URL in an error message carries the instance CRN encoded, never verbatim.
+    def leaky(token: str, instance: str) -> Any:
+        raise ConnectionError(f"GET /jobs?instance={encode(instance)}&token={encode(token)}")
+
+    with pytest.raises(IBMError) as caught:
+        IBMTransport(leaky)
+    message = str(caught.value)
+    for secret in (TOKEN, INSTANCE):
+        assert encode(secret) not in message
+    assert "<QISKIT_IBM_INSTANCE>" in message
+
+
+def test_measurements_landing_in_other_classical_bits_are_refused(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from qiskit import QuantumCircuit  # noqa: PLC0415 - only this test builds one by hand
+
+    def swapping(circuit: Any, **_kwargs: Any) -> Any:
+        swapped = QuantumCircuit(circuit.num_qubits, circuit.num_clbits)
+        for instruction in circuit.data:
+            if instruction.operation.name == "measure":
+                (qubit,) = instruction.qubits
+                index = circuit.find_bit(qubit).index
+                swapped.measure(index, 1 - index)
+            else:
+                swapped.append(instruction)
+        return swapped
+
+    monkeypatch.setattr("coin.ibm.transpile", swapping)
+    transport = IBMTransport(lambda _t, _i: FakeService(heron_like(2)))
+    two = to_qasm(Circuit(2).measure(0, 0).measure(1, 1))
+    with pytest.raises(IBMError, match="changed the circuit"):
+        transport.run("fake", two, [0, 1], 10)
