@@ -288,14 +288,16 @@ def _pool(args: argparse.Namespace) -> int:
     if not batches:
         print("the pool is empty; run `coin harvest` to fill it")
         return 0
-    print(f"{'batch':<34} {'qubit':>5} {'bits':>8} {'spent':>8} {'remaining':>10}")
+    # Batch names carry the time to the microsecond, so size the column to them.
+    w = max(len("batch"), *(len(b.batch) for b in batches))
+    print(f"{'batch':<{w}} {'qubit':>5} {'bits':>8} {'spent':>8} {'remaining':>10}")
     for b in batches:
         print(
-            f"{b.batch:<34} {b.provenance.get('qubit', '?'):>5} {b.total:>8,} {b.spent:>8,} "
+            f"{b.batch:<{w}} {b.provenance.get('qubit', '?'):>5} {b.total:>8,} {b.spent:>8,} "
             f"{b.remaining:>10,}"
         )
     print(
-        f"{'total':<34} {'':>5} {sum(b.total for b in batches):>8,} "
+        f"{'total':<{w}} {'':>5} {sum(b.total for b in batches):>8,} "
         f"{sum(b.spent for b in batches):>8,} {sum(b.remaining for b in batches):>10,}"
     )
     return 0
