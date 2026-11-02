@@ -47,6 +47,18 @@ scripts/task fmt     # fix formatting and autofixable lint
 `pre-commit` runs format and lint checks; `pre-push` runs the full `check`. CI runs the
 same `scripts/task check`. Never bypass a hook with `--no-verify`.
 
+## Property tests
+
+Hypothesis is derandomized by default, so every run, local or CI, tries the same examples
+and a failure always reproduces. To search for new failures, explore randomly:
+
+```sh
+HYPOTHESIS_PROFILE=explore scripts/task test
+```
+
+A failure found that way becomes a fixed test case (with `@example`, or a plain test), so it
+stays caught once the exploration moves on.
+
 ## Figures
 
 Every figure in `docs/figures/` is rendered from `data/runs/` by `scripts/figures`, and

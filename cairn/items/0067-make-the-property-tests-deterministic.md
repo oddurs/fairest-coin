@@ -3,10 +3,12 @@ id: 67
 uid: 888da86a-1387-487c-bd46-9c50f226690a
 title: Make the property tests deterministic
 type: chore
-status: backlog
+status: done
 milestone: v0.2
+assignee: Oddur Sigurdsson
 created: 2026-11-01
 updated: 2026-11-01
+closed_at: 2026-11-01
 priority: p1
 effort: s
 area: tooling
@@ -27,7 +29,11 @@ and no example database, so every run explores the same examples. A separate opt
 
 ## Acceptance criteria
 
-- [ ] Two consecutive runs of the full suite draw identical examples (shown by a test or by
+- [x] Two consecutive runs of the full suite draw identical examples (shown by a test or by
       hypothesis statistics)
-- [ ] `HYPOTHESIS_PROFILE=explore scripts/task test` explores randomly
-- [ ] CONTRIBUTING.md says how to explore and what to do when exploration finds a failure
+- [x] `HYPOTHESIS_PROFILE=explore scripts/task test` explores randomly
+- [x] CONTRIBUTING.md says how to explore and what to do when exploration finds a failure
+
+## Result
+
+tests/conftest.py loads a derandomized hypothesis profile with no example database by default; HYPOTHESIS_PROFILE=explore searches randomly with 1,000 examples. tests/test_determinism.py proves two runs draw identical examples (and explore runs differ, checked by hand). CONTRIBUTING.md explains exploring and turning a found failure into a fixed case.
