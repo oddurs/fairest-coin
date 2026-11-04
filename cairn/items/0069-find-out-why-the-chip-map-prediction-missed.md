@@ -80,8 +80,9 @@ per-qubit prediction hopeless.** Evidence:
      The large ones do not: the plain correlation, dominated by them, is −0.05, and new
      outliers appeared (qubit 90 at +9.1%, 85 at +5.6%). (Corrected after the v0.1–v0.3
      review; this first read only the −0.05.)
-   - Even with readout measured in the same session (23 minutes before the coin, because
-     of queueing), the readout-only model put 59 of 156 coins within 3σ. With published
+   - Even with readout measured in the same session (the |1⟩ job within two minutes of
+     the coin; the |0⟩ job submitted 23 minutes before it and queued for 22, so it ran at
+     some point in that window), the readout-only model put 59 of 156 coins within 3σ. With published
      readout, the same coin run scored 44 of 147.
 
 **Consequence.** No calibration, published or measured, predicts an individual qubit's coin
@@ -89,8 +90,10 @@ to better than about a percent for longer than it holds still. So the project st
 predicting bias and removes it (chapter 3).
 
 **Caveats.**
-- The readout jobs and the coin ran 23 minutes apart, so the measured-readout comparison
-  mixes readout error with drift.
+- The |0⟩ readout job was submitted 23 minutes before the coin and queued for 22 of them;
+  the archive records when results came back, not when jobs ran, so the gap between the
+  readout and the coin is somewhere between two and 23 minutes. Over that window the
+  measured-readout comparison mixes readout error with drift.
 - The coherent-error bound shows that coherence *could* explain the state-preparation lean,
   not that it does. An error-amplification circuit (sx repeated 4k+1 times) would test it
   directly, and is left for later.

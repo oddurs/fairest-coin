@@ -121,8 +121,12 @@ Every qubit has all of these errors at once. Spike 0018 switched them on one at 
 every qubit with complete calibration, to see which ones bias the coin. Its script runs on
 any archived run. On the first run's calibration:
 
-```text
+```console
 $ uv run python analysis/dominant_errors.py data/runs/2026-11-01-dbjsk29ffo6c73baaosg
+qubits analysed: 151 of 156
+incomplete calibration (skipped): {82: ['T2'], 94: ['T1', 'T2'], 130: ['T1', 'T2']}
+T2 > 2·T1 (skipped): [20, 83]
+no init_error (preparation row only): [23, 26, 113, 119, 121, 135]
 source                                                      median   max |·|
 readout asymmetry                                         -0.00439   0.26172
 T1/T2 during sx                                           -0.00011   0.00330
@@ -311,8 +315,10 @@ taken before the run, however recent, could have described them exactly.
 
 ## What this means
 
-Spike 0069 tested these explanations. Three jobs ran back to back on every qubit: prepare
-|0⟩ and measure, prepare |1⟩ and measure, and the coin again. The first two measure each
+Spike 0069 tested these explanations. Three jobs ran on every qubit in one session:
+prepare |0⟩ and measure, prepare |1⟩ and measure, and the coin again. The last two ran
+within two minutes of each other; the first queued for twenty minutes, and the archive
+does not say exactly when in that time it ran. The first two measure each
 qubit's readout as a job actually sees it, and the published readout matched poorly
 (qubit 59 above is the extreme case).
 
@@ -332,10 +338,14 @@ Undoing the measured readout recovers what the coin did before it was read:
 (155, '+0.63%')
 ```
 
-Before it is measured, the typical coin leans *tails* by 0.63%: a chip-wide lean in the
-state preparation, within what a coherent `sx` error of the published size allows. The
-readout then pulls toward heads. That is why the prediction, built on readout alone, had the
-sign wrong.
+Before it is measured, the typical coin on this second chip map leans *tails* by 0.63%: a
+chip-wide lean in the state preparation, within what a coherent `sx` error of the published
+size allows. The readout then pulls toward heads. The second map's prediction missed the
+same way the first did (−0.40% predicted, +0.17% measured): both took their lean almost
+entirely from the published readout, as the table of dominant errors showed, and neither
+has a term for a lean in the state itself. That is the likeliest reason the first
+prediction had the sign wrong. The first map has no readout measured alongside it, so it
+cannot be checked directly.
 
 For the question this project asks, the result matters. Chapter 0 distrusted random numbers
 that come from a process you have to take on faith. This chapter took the manufacturer's
