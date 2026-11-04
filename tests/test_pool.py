@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+import coin.durable
 import coin.pool
 from coin.pool import POOL_ENV, EmptyPoolError, Pool, default_path
 
@@ -148,14 +149,14 @@ def test_batches_added_in_the_same_second_come_out_oldest_first(tmp_path: Path) 
 def test_a_crash_while_adding_leaves_a_working_pool(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, suffix: str
 ) -> None:
-    real = coin.pool._write_atomic
+    real = coin.durable.replace
 
     def crash_on_bits(path: Path, data: bytes) -> None:
         if path.suffix == suffix:
             raise OSError("power cut")
         real(path, data)
 
-    monkeypatch.setattr(coin.pool, "_write_atomic", crash_on_bits)
+    monkeypatch.setattr(coin.durable, "replace", crash_on_bits)
     pool = Pool(tmp_path)
     with pytest.raises(OSError, match="power cut"):
         pool.add([1, 0, 1], {}, label="a")
@@ -175,7 +176,7 @@ def test_a_failed_write_never_leaves_a_half_written_record(
     def fail(descriptor: int) -> None:
         raise OSError("disk full")
 
-    monkeypatch.setattr(coin.pool, "_sync", fail)
+    monkeypatch.setattr(coin.durable, "sync", fail)
     with pytest.raises(OSError, match="disk full"):
         pool.take(2)
     monkeypatch.undo()

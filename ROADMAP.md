@@ -41,13 +41,12 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 
 ## v0.3.2 — Hardening, second pass
 
-`##········` 14% · 1 of 7 done · due 2026-11-11
+`###·······` 29% · 2 of 7 done · due 2026-11-11
 
 v0.3.2: every defect found by the review of v0.3 as released is fixed: a committed run can
 
 ### backlog
 
-- [ ] [`0089`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0089-write-the-archive-as-durably-as-the-pool.md) Write the archive as durably as the pool <sup>bug · p1 · hardware</sup>
 - [ ] [`0090`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0090-trust-only-this-user-s-pending-records-in-recovery.md) Trust only this user's pending records in recovery <sup>bug · p1 · hardware</sup>
 - [ ] [`0091`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0091-say-what-the-min-entropy-estimate-cannot-see.md) Say what the min-entropy estimate cannot see <sup>bug · p1 · extract</sup>
 - [ ] [`0092`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0092-validate-archive-and-mitigation-inputs-and-kill-the-other-mutants.md) Validate archive and mitigation inputs and kill the other mutants <sup>chore · p2 · tooling</sup>
@@ -57,6 +56,7 @@ v0.3.2: every defect found by the review of v0.3 as released is fixed: a committ
 ### done
 
 - [x] [`0088`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0088-refuse-a-committed-run-however-its-path-is-written.md) Refuse a committed run however its path is written <sup>bug · p0 · extract</sup>
+- [x] [`0089`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0089-write-the-archive-as-durably-as-the-pool.md) Write the archive as durably as the pool <sup>bug · p1 · hardware</sup>
 
 ## v0.2 — The real coin
 

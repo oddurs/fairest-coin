@@ -30,7 +30,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from coin import __version__
+from coin import __version__, durable
 from coin.archive import ArchiveError, Prediction, Run, write_run
 from coin.circuit import Circuit
 from coin.compile import to_qasm
@@ -435,13 +435,8 @@ def _result_from_json(data: dict[str, Any]) -> JobResult:
 
 
 def _write_json_atomic(path: Path, data: dict[str, Any]) -> None:
-    """Write via a temporary file, flushed to disk, then renamed over `path`."""
-    temporary = path.with_name(f"{path.name}.tmp")
-    with temporary.open("w") as handle:
-        handle.write(json.dumps(data, default=str))
-        handle.flush()
-        os.fsync(handle.fileno())
-    temporary.replace(path)
+    """Write `path` whole or not at all, and durably: it may be all that is left of a job."""
+    durable.replace(path, json.dumps(data, default=str).encode())
 
 
 def _archive(record: dict[str, Any], result: JobResult, runs_dir: Path) -> Path:
@@ -471,6 +466,6 @@ def _archive(record: dict[str, Any], result: JobResult, runs_dir: Path) -> Path:
 
 
 def _require_writable(runs_dir: Path) -> None:
-    runs_dir.mkdir(parents=True, exist_ok=True)
+    durable.make_directory(runs_dir)
     if not os.access(runs_dir, os.W_OK):
         raise ValueError(f"{runs_dir} is not writable, so a run there could not be archived")
