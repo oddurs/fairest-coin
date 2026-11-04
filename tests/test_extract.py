@@ -464,3 +464,11 @@ WORST_REVIEWED_OVERSTATEMENT = 1.77
 
 def test_the_safety_factor_covers_the_worst_reviewed_overstatement() -> None:
     assert SAFETY * WORST_REVIEWED_OVERSTATEMENT <= 1
+
+
+def test_the_worst_block_reaches_the_end_of_the_input() -> None:
+    # 2,500 bits in blocks of 1,000: the last 500, all ones, lie only in the extra block
+    # ending at n. Skipping it would leave the estimate near 0.55.
+    rng = np.random.default_rng(3)
+    x = np.concatenate([rng.integers(0, 2, 2000), np.ones(500, dtype=np.int64)])
+    assert min_entropy(x) < 0.4

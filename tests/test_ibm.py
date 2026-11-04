@@ -369,3 +369,48 @@ def test_measurements_landing_in_other_classical_bits_are_refused(
     two = to_qasm(Circuit(2).measure(0, 0).measure(1, 1))
     with pytest.raises(IBMError, match="changed the circuit"):
         transport.run("fake", two, [0, 1], 10)
+
+
+def test_a_job_whose_id_never_arrives_may_have_been_submitted(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The job may be on the hardware without its id reaching us: say so, so its pending
+    # record is kept rather than discarded as never submitted.
+    class NoId(DoneJob):
+        def job_id(self) -> str:
+            raise ConnectionError("dropped")
+
+    transport = with_job(monkeypatch, NoId({}))
+    with pytest.raises(IBMError) as caught:
+        transport.run("fake", NATIVE_COIN_QASM, [0], 3)
+    assert getattr(caught.value, "maybe_submitted", False)
+
+
+def test_the_charge_wins_over_the_older_quantum_seconds(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    usage = {"qpu_charge_time_seconds": 8, "quantum_seconds": 3}
+    transport = with_job(monkeypatch, DoneJob({"usage": usage}))
+    assert transport.run("fake", NATIVE_COIN_QASM, [0], 3).quantum_seconds == pytest.approx(8.0)
+
+
+def test_an_angle_changed_in_its_third_decimal_is_refused(
+    credentials: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from qiskit import QuantumCircuit  # noqa: PLC0415 - only these tests build one by hand
+
+    def nudging(circuit: Any, **_kwargs: Any) -> Any:
+        nudged = QuantumCircuit(circuit.num_qubits, circuit.num_clbits)
+        for instruction in circuit.data:
+            if instruction.operation.name == "rz":
+                (qubit,) = instruction.qubits
+                angle = float(instruction.operation.params[0]) + 1e-3
+                nudged.rz(angle, circuit.find_bit(qubit).index)
+            else:
+                nudged.append(instruction)
+        return nudged
+
+    monkeypatch.setattr("coin.ibm.transpile", nudging)
+    transport = IBMTransport(lambda _t, _i: FakeService(heron_like(2)))
+    with pytest.raises(IBMError, match="changed the circuit"):
+        transport.run("fake", NATIVE_COIN_QASM, [0], 10)
