@@ -17,6 +17,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from coin import durable
+
 CALIBRATION = "calibration.json.gz"
 CIRCUIT = "circuit.qasm"
 COUNTS = "counts.json"
@@ -198,15 +200,16 @@ def write_run(runs_dir: Path | str, run: Run, *, allow_no_prediction: bool = Fal
 
     # Write into a hidden staging directory and rename it into place: a run appears whole or
     # not at all, so a failure halfway can never leave a partial run blocking its own retry.
-    Path(runs_dir).mkdir(parents=True, exist_ok=True)
-    staging = Path(tempfile.mkdtemp(prefix=f".{run.directory_name}.", dir=runs_dir))
+    runs = Path(runs_dir)
+    durable.make_directory(runs)
+    staging = Path(tempfile.mkdtemp(prefix=f".{run.directory_name}.", dir=runs))
     try:
         _write_json(staging / META, meta)
-        (staging / CIRCUIT).write_text(run.circuit_qasm)
+        durable.write(staging / CIRCUIT, run.circuit_qasm.encode())
         # Whole-chip runs have ~100,000 distinct 156-bit outcomes: gzip keeps them committable.
         _write_gzip(staging / f"{COUNTS}.gz", _dump_json(run.counts))
         # mtime=0 keeps the bytes a function of the calibration alone, so git sees no churn.
-        (staging / CALIBRATION).write_bytes(gzip.compress(_dump_json(run.calibration), mtime=0))
+        durable.write(staging / CALIBRATION, gzip.compress(_dump_json(run.calibration), mtime=0))
         if run.prediction is not None:
             _write_json(staging / PREDICTION, _prediction_json(run.prediction))
         if run.prediction_dryrun is not None:
@@ -216,8 +219,12 @@ def write_run(runs_dir: Path | str, run: Run, *, allow_no_prediction: bool = Fal
         if run.usage is not None:
             _write_json(staging / USAGE, run.usage)
         if run.submit_script is not None:
-            (staging / SUBMIT).write_text(run.submit_script)
+            durable.write(staging / SUBMIT, run.submit_script.encode())
+        # Every file is on the drive; now the names: the staging directory's, then the
+        # rename in the runs directory. Only then is the run safe to rely on.
+        durable.sync_directory(staging)
         staging.rename(target)
+        durable.sync_directory(runs)
     except BaseException:
         # Best effort: the original error is the one worth reporting.
         shutil.rmtree(staging, ignore_errors=True)
@@ -298,7 +305,7 @@ def _write_gzip(path: Path, data: bytes) -> None:
     # mtime=0 keeps the bytes a function of the data alone, so git sees no churn. Level 6, not
     # the default 9: on random bit strings level 9's match search takes 88 s for 16 MB against
     # 2.7 s at level 6, for a file only 6% smaller.
-    path.write_bytes(gzip.compress(data, compresslevel=6, mtime=0))
+    durable.write(path, gzip.compress(data, compresslevel=6, mtime=0))
 
 
 def _parse_json(path: Path, text: str) -> Any:
@@ -383,7 +390,7 @@ def _dump_json(data: object) -> bytes:
 
 
 def _write_json(path: Path, data: object) -> None:
-    path.write_bytes(_dump_json(data))
+    durable.write(path, _dump_json(data))
 
 
 def add_record(run_dir: Path | str, name: str, data: object) -> Path:
@@ -398,7 +405,5 @@ def add_record(run_dir: Path | str, name: str, data: object) -> Path:
     target = root / name
     if target.exists():
         raise ArchiveError(f"{target} already exists")
-    temporary = root / f".{name}.tmp"
-    temporary.write_bytes(_dump_json(data))
-    temporary.replace(target)
+    durable.replace(target, _dump_json(data))
     return target

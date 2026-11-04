@@ -40,6 +40,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from coin import durable
 from coin.extract import Bits, as_bits
 
 POOL_ENV = "COIN_POOL"
@@ -93,7 +94,7 @@ class Pool:
         batch = f"{datetime.now(UTC):%Y%m%dT%H%M%S%f}-{label}"
         if not _BATCH.fullmatch(batch):
             raise ValueError(f"label must be letters, digits, - or _, got {label!r}")
-        self.path.mkdir(parents=True, exist_ok=True)
+        durable.make_directory(self.path)
         record = {**provenance, "bits": len(x), "added_at": datetime.now(UTC).isoformat()}
         with self._locked():
             if (self.path / f"{batch}.bits").exists():
@@ -109,8 +110,8 @@ class Pool:
                 if job is None and run is not None and existing.get("run") == run:
                     raise ValueError(f"run {run} is already pooled, as batch {name}")
             # Bits and provenance first, both atomically; a batch exists once its .bits does.
-            _write_atomic(self.path / f"{batch}.json", json.dumps(record, indent=2).encode())
-            _write_atomic(self.path / f"{batch}.bits", np.packbits(x).tobytes())
+            durable.replace(self.path / f"{batch}.json", json.dumps(record, indent=2).encode())
+            durable.replace(self.path / f"{batch}.bits", np.packbits(x).tobytes())
         return batch
 
     def take(self, n: int) -> list[Draw]:
@@ -149,7 +150,7 @@ class Pool:
                 for batch, start, count in draws
             ]
             # Recorded as spent before anything is returned.
-            _write_atomic(self.path / "spent.json", json.dumps(spent, indent=2).encode())
+            durable.replace(self.path / "spent.json", json.dumps(spent, indent=2).encode())
         return result
 
     def status(self) -> list[BatchStatus]:
@@ -172,7 +173,7 @@ class Pool:
 
     @contextmanager
     def _locked(self) -> Generator[None]:
-        self.path.mkdir(parents=True, exist_ok=True)
+        durable.make_directory(self.path)
         with (self.path / "lock").open("a") as handle:
             fcntl.flock(handle, fcntl.LOCK_EX)
             try:
@@ -200,36 +201,6 @@ class Pool:
         if len(bits) != n:
             raise ValueError(f"batch {batch} holds {len(bits)} bits, but records {n}")
         return bits
-
-
-def _write_atomic(path: Path, data: bytes) -> None:
-    """Write via a temporary file, flushed to disk, then renamed over `path`."""
-    temporary = path.with_name(f".{path.name}.tmp")
-    with temporary.open("wb") as handle:
-        handle.write(data)
-        handle.flush()
-        _sync(handle.fileno())
-    temporary.replace(path)
-    # The rename is durable only once the directory is: without this, a power cut could bring
-    # back the old spent.json and hand out bits a second time.
-    directory = os.open(path.parent, os.O_RDONLY)
-    try:
-        _sync(directory)
-    finally:
-        os.close(directory)
-
-
-def _sync(descriptor: int) -> None:
-    # On macOS fsync leaves the data in the drive's cache; F_FULLFSYNC asks the drive to
-    # write it. Elsewhere fsync is the strongest there is.
-    full = getattr(fcntl, "F_FULLFSYNC", None)
-    if full is not None:
-        try:
-            fcntl.fcntl(descriptor, full)
-            return
-        except OSError:
-            pass  # the filesystem does not support it; fsync below still applies
-    os.fsync(descriptor)
 
 
 def receipt(draw: Draw, flipped_at: datetime) -> dict[str, Any]:
