@@ -9,7 +9,8 @@ A tossed coin is deterministic physics: it lands on the side it started on sligh
 often than half the time. A pseudo-random generator is deterministic by design. Statistical
 tests can only fail to find a pattern; they can never prove there isn't one. Quantum
 mechanics is the one place where randomness can come with a proof, and the proof needs
-entanglement.
+entanglement and assumptions about the devices; this project names the ones it cannot
+remove.
 
 This project builds a quantum coin from nothing, with its own simulator, noise model and
 compiler, and runs it on real IBM quantum hardware, asking the same question more
@@ -72,8 +73,8 @@ On real hardware (an IBM Quantum account; QPU time is spent only with `--submit`
 | 5. The proof | Can randomness be certified? | upcoming in v0.4 |
 | Epilogue | What would it really take? | upcoming in v1.0 |
 
-Every Python example, code excerpt and `coin` command in the chapters is run by the test
-suite, so the essay cannot drift from the code. The plan, milestone by milestone, is in
+Every Python example, code excerpt and command shown with its output in the chapters is
+run by the test suite, so the essay cannot drift from the code. The plan, milestone by milestone, is in
 [ROADMAP.md](ROADMAP.md).
 
 ## Development

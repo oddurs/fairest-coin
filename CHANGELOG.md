@@ -42,7 +42,7 @@ that would have caught it, and a v0.4 plan rebuilt on what the hardware showed.
 - The pool could take one job twice, or a run that was not a harvest or was already
   published.
 - `coin compare` failed on a chip map whose calibration had no readout length.
-- The noise model counted gate relaxation twice (an effect on the coin under 1.3e-5).
+- The noise model counted gate relaxation twice (an effect on the coin of about 1.3e-5).
 - Four places where a mutant of the code survived the tests.
 - The pre-push hook misread whether runs were tracked when git set `GIT_DIR`.
 

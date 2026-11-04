@@ -2,13 +2,15 @@
 
 - `>>>` examples inside ```pycon blocks run as doctests.
 - A ```python block preceded by `<!-- from: PATH -->` must appear verbatim in PATH.
-- Every `$ coin ...` line in a ```console block is run, and its output must match the
-  lines that follow it, up to the next `$` line.
+- Every `$ coin ...` and `$ uv run python analysis/...` line in a ```console block is
+  run, and its output must match the lines that follow it, up to the next `$` line.
 """
 
 import doctest
 import re
 import shlex
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -57,8 +59,20 @@ def run_coin(argv: list[str], capsys: pytest.CaptureFixture[str]) -> tuple[int, 
     return code, capsys.readouterr().out
 
 
+ANALYSIS = ["uv", "run", "python"]
+
+
+def run_analysis(argv: list[str]) -> tuple[int, str]:
+    # The suite already runs inside the project's environment: no need for uv again.
+    assert argv[0].startswith("analysis/"), f"only analysis scripts can be checked: {argv}"
+    done = subprocess.run(
+        [sys.executable, *argv], cwd=ROOT, capture_output=True, text=True, check=False
+    )
+    return done.returncode, done.stdout
+
+
 def check_console(text: str, capsys: pytest.CaptureFixture[str]) -> int:
-    """Run every `$ coin ...` line in every console block; return how many were checked.
+    """Run every command in every console block; return how many were checked.
 
     A command's expected output is every line after it, up to the next `$` line.
     """
@@ -66,8 +80,12 @@ def check_console(text: str, capsys: pytest.CaptureFixture[str]) -> int:
     for block in CONSOLE.finditer(text):
         for command, expected in PROMPT.findall(block["body"]):
             argv = shlex.split(command)
-            assert argv[0] == "coin", f"only `coin` commands can be checked: {command}"
-            assert run_coin(argv[1:], capsys) == (0, expected), f"`$ {command}` disagrees"
+            if argv[:3] == ANALYSIS:
+                result = run_analysis(argv[3:])
+            else:
+                assert argv[0] == "coin", f"only `coin` and analysis commands run: {command}"
+                result = run_coin(argv[1:], capsys)
+            assert result == (0, expected), f"`$ {command}` disagrees"
             checked += 1
     return checked
 
@@ -91,3 +109,17 @@ def test_a_wrong_second_command_is_caught(capsys: pytest.CaptureFixture[str]) ->
     text = "```console\n$ coin --version\ncoin 0.0.0-not-this\n```\n"
     with pytest.raises(AssertionError, match="disagrees"):
         check_console(text, capsys)
+
+
+def test_an_analysis_script_in_a_block_is_checked(capsys: pytest.CaptureFixture[str]) -> None:
+    run = "data/runs/2026-11-01-dbjsk29ffo6c73baaosg"
+    command = f"uv run python analysis/dominant_errors.py {run}"
+    wrong = f"```console\n$ {command}\nnothing like this\n```\n"
+    with pytest.raises(AssertionError, match="disagrees"):
+        check_console(wrong, capsys)
+
+
+def test_no_chapter_shows_output_the_suite_does_not_check() -> None:
+    # A ```text block of command output would escape the checks above.
+    for chapter in CHAPTERS:
+        assert "```text\n$ " not in chapter.read_text(), chapter.name
