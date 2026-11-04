@@ -169,8 +169,15 @@ secret.
 - by their position in a cycle.
 
 Two independent reviews tried to fool it, with sources a qubit could plausibly produce. One
-of them fooled it by up to 1.77 times, so extraction spends only half the estimate. For
-qubit 104 the estimate was 0.884 bits per shot, and 0.442 was spent. The run's
+of them fooled it by up to 1.77 times, so extraction spends only half the estimate.
+
+Half covers what those reviews found, not everything. A third review built a source in
+which each bit is the parity of the bits 17 and 20 before it, flipped 5% of the time. It
+carries 0.074 bits of min-entropy per bit, and the estimate says about 0.91: none of the
+guessers looks at two earlier bits at once, and no margin covers a twelvefold miss. The
+estimate sees bias, drift, switching, cycles and short memory, and is blind beyond them.
+
+For qubit 104 the estimate was 0.884 bits per shot, and 0.442 was spent. The run's
 `extraction.json` records that, along with the seed.
 
 ```pycon
@@ -187,8 +194,8 @@ qubit 104 the estimate was 0.884 bits per shot, and 0.442 was spent. The run's
 (22173, 21971)
 ```
 
-44,144 bits at ε = 2.3 × 10⁻¹⁰, which is 50.23% tails, well within the wobble of a fair
-coin. They pass all six p-values; the smallest is 0.21.
+44,144 bits, within ε = 2.3 × 10⁻¹⁰ of uniform if the estimate holds, and 50.23% tails,
+well within the wobble of a fair coin. They pass all six p-values; the smallest is 0.21.
 
 These were the bits in this project's first entropy pool, and they are already spent:
 `coin flip` handed out exactly those 21,971 heads and 22,173 tails. That order matters. The

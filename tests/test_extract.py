@@ -1,4 +1,5 @@
 import math
+import secrets
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,7 @@ from coin.archive import load_run
 from coin.battery import ALPHA, battery, passes, pi_bits, serial
 from coin.extract import (
     SAFETY,
+    _upper,
     as_bits,
     min_entropy,
     peres,
@@ -394,3 +396,71 @@ def test_a_repeated_block_scores_zero_at_any_length(n: int, block: int) -> None:
         pytest.skip("the block does not repeat within n bits")
     x = np.resize(coin(0.5, block, seed=block), n)
     assert min_entropy(x) == pytest.approx(0.0, abs=0.02)
+
+
+def parity_source(n: int, seed: int) -> np.ndarray:
+    """Each bit the parity of the bits 17 and 20 back, flipped with probability 0.05."""
+    rng = np.random.default_rng(seed)
+    x = rng.integers(0, 2, n).astype(np.uint8)
+    flips = (rng.random(n) < 0.05).astype(np.uint8)
+    for i in range(20, n):
+        x[i] = x[i - 17] ^ x[i - 20] ^ flips[i]
+    return x
+
+
+def test_the_estimate_is_blind_to_a_parity_of_two_earlier_bits() -> None:
+    # The v0.3 review's source, the miss chapter 3 and SAFETY's comment describe: no guesser
+    # looks at two earlier bits at once. If one ever does, this fails; update the essay.
+    true = -math.log2(0.95)
+    h = min_entropy(parity_source(100_000, seed=7))
+    assert h == pytest.approx(0.91, abs=0.02)
+    assert SAFETY * h > 5 * true
+
+
+def test_a_copy_from_700_bits_back_is_seen() -> None:
+    # Within the lag guessers' reach (1,024): a narrower reach would score this near 0.9.
+    rng = np.random.default_rng(13)
+    x = rng.integers(0, 2, 100_000).astype(np.uint8)
+    copy = rng.random(100_000) < 0.9
+    for i in range(700, len(x)):
+        if copy[i]:
+            x[i] = x[i - 700]
+    assert min_entropy(x) <= -math.log2(0.95)
+
+
+def test_a_function_of_the_last_12_bits_is_seen() -> None:
+    # Within the Markov guessers' reach (order 16); no single earlier bit reveals it, so an
+    # order-8 limit would score it near 0.9. Learning 4,096 contexts costs some guesses, so
+    # the bound is looser than the truth (0.074).
+    rng = np.random.default_rng(14)
+    table = rng.integers(0, 2, 4096).astype(np.uint8)
+    flips = (rng.random(100_000) < 0.05).astype(np.uint8)
+    x = rng.integers(0, 2, 100_000).astype(np.uint8)
+    context = 0
+    for i in range(12, len(x)):
+        context = int(x[i - 12 : i].dot(1 << np.arange(12)))
+        x[i] = table[context] ^ flips[i]
+    assert min_entropy(x) < 0.3
+
+
+def test_the_confidence_bound_is_99_5_percent() -> None:
+    # p + z·√(p(1−p)/(n−1)) with z = 2.576, as SP 800-90B; a narrower bound overstates.
+    assert _upper(0.5, 10_001) == pytest.approx(0.5 + 2.576 * 0.5 / 100, abs=EXACT)
+    assert _upper(0.5, 1) == 1.0
+
+
+def test_seeds_come_from_the_operating_system(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(secrets, "token_bytes", lambda n: b"\xff" * n)
+    assert seed_bits(12).tolist() == [1] * 12
+    monkeypatch.undo()
+    assert not np.array_equal(seed_bits(256), seed_bits(256))
+
+
+# The most an adversarial review made the estimate overstate a source within its reach
+# (0070's second review). The sources in this file reach 1.28 times, so they alone would
+# let SAFETY creep up to 0.78.
+WORST_REVIEWED_OVERSTATEMENT = 1.77
+
+
+def test_the_safety_factor_covers_the_worst_reviewed_overstatement() -> None:
+    assert SAFETY * WORST_REVIEWED_OVERSTATEMENT <= 1
