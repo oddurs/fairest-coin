@@ -427,13 +427,43 @@ def test_publish_refuses_a_copy_of_the_run(calibration: dict[str, Any], tmp_path
     assert not (copy / "extraction.json").exists()
 
 
-def test_a_run_tracked_by_git_is_not_pooled(capsys: pytest.CaptureFixture[str]) -> None:
-    # The first chip map is committed; any committed run's shots are public.
+COMMITTED = "data/runs/2026-11-02-dbjuh5d6p51s73cljo60"
+
+
+@pytest.mark.parametrize("how", ["absolute", "relative", "symlink"])
+def test_a_run_tracked_by_git_is_not_pooled(
+    how: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # The first chip map is committed; any committed run's shots are public, however the
+    # path to it is written. A relative path once slipped through.
+    path = ROOT / COMMITTED
+    if how == "relative":
+        monkeypatch.chdir(ROOT)
+        path = Path(COMMITTED)
+    elif how == "symlink":
+        path = tmp_path / "link"
+        path.symlink_to(ROOT / COMMITTED)
     code, _, err = cli_run(
-        ["harvest", "--from-run", str(ROOT / "data/runs/2026-11-02-dbjuh5d6p51s73cljo60")], capsys
+        ["harvest", "--from-run", str(path), "--pool", str(tmp_path / "pool")], capsys
     )
     assert code == 1
     assert "tracked by git" in err
+    assert not (tmp_path / "pool").exists()
+
+
+def test_a_run_git_cannot_vouch_for_is_not_pooled(
+    calibration: dict[str, Any], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A repository git cannot read: whether the run is committed is unknown, so it is refused.
+    (tmp_path / ".git").write_text("gitdir: /nonexistent\n")
+    chosen = harvest.plan("b", calibration, SHOTS)
+    run_dir = harvest.submit(FakeTransport(calibration), chosen.submission, tmp_path / "runs")
+    code, _, err = cli_run(
+        ["harvest", "--from-run", str(run_dir), "--pool", str(tmp_path / "pool")], capsys
+    )
+    assert code == 1
+    assert "git could not say whether it is tracked" in err
+    assert not (tmp_path / "pool").exists()
 
 
 def test_a_run_with_no_prediction_is_named_as_such(

@@ -360,32 +360,45 @@ def _harvest(args: argparse.Namespace) -> int:
     return _harvest_new(args)
 
 
-def _tracked_by_git(path: Path) -> bool:
-    """Whether git tracks anything in `path`: if so its shots are, or will be, public."""
+def _why_public(path: Path) -> str | None:
+    """Why `path`'s shots may be public, or None when git has never seen them."""
+    where = path.resolve()
+    folder = where if where.is_dir() else where.parent
+    if not any((d / ".git").exists() for d in (folder, *folder.parents)):
+        return None  # outside every repository, nothing could have been committed
     # Git's own variables (set, for one, while a hook runs) would point it at another
     # repository than the one `path` is in; let it find the right one from `path`.
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     try:
         listed = subprocess.run(
-            ["git", "ls-files", "--", str(path)],
-            cwd=path if path.is_dir() else path.parent,
+            ["git", "ls-files", "--", str(where)],
+            cwd=folder,
             capture_output=True,
             text=True,
             check=False,
             env=env,
         )
-    except OSError:  # no git on this machine: nothing it could have published
-        return False
-    return listed.returncode == 0 and bool(listed.stdout.strip())
+    except OSError as error:
+        detail = str(error)
+    else:
+        if listed.returncode == 0:
+            if not listed.stdout.strip():
+                return None
+            return (
+                "is tracked by git, so its shots are public and its bits would be "
+                "predictable; harvest a run that has not been committed"
+            )
+        detail = listed.stderr.strip() or f"git exited {listed.returncode}"
+    # Inside a repository an unanswered question is not a no.
+    return (
+        f"is inside a git repository, but git could not say whether it is tracked "
+        f"({detail}); fix that, or harvest a run kept outside the repository"
+    )
 
 
 def _harvest_from_run(args: argparse.Namespace) -> int:
-    if _tracked_by_git(args.from_run):
-        print(
-            f"coin harvest: {args.from_run} is tracked by git, so its shots are public and its "
-            "bits would be predictable; harvest a run that has not been committed",
-            file=sys.stderr,
-        )
+    if (why := _why_public(args.from_run)) is not None:
+        print(f"coin harvest: {args.from_run} {why}", file=sys.stderr)
         return 1
     try:
         result = harvest.extract_run(args.from_run, Pool(args.pool))
