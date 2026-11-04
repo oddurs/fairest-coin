@@ -42,19 +42,21 @@ def make_directory(path: Path) -> None:
     path.mkdir(exist_ok=True)  # a file in the way raises FileExistsError, as mkdir would
 
 
-def write(path: Path, data: bytes) -> None:
+def write(path: Path, data: bytes, mode: int = 0o644) -> None:
     """Write `data` to `path` and sync it. The name is durable only once the caller syncs
-    the directory, which lets a caller writing many files sync it once."""
-    with path.open("wb") as handle:
+    the directory, which lets a caller writing many files sync it once. A new file gets
+    `mode` (less the umask)."""
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode), "wb") as handle:
         handle.write(data)
         handle.flush()
         sync(handle.fileno())
 
 
-def replace(path: Path, data: bytes) -> None:
+def replace(path: Path, data: bytes, mode: int = 0o644) -> None:
     """Put `data` at `path` whole or not at all, durably: a synced temporary file renamed
-    over it, then the directory synced."""
+    over it, then the directory synced. The file gets `mode` (less the umask)."""
     temporary = path.with_name(f".{path.name}.tmp")
-    write(temporary, data)
+    temporary.unlink(missing_ok=True)  # a leftover would keep its own mode
+    write(temporary, data, mode)
     temporary.replace(path)
     sync_directory(path.parent)

@@ -11,6 +11,7 @@ compile suite's unexplained failure. A per-example wall-clock limit is itself a 
 """
 
 import os
+from collections.abc import Generator
 
 import pytest
 from hypothesis import settings
@@ -21,6 +22,11 @@ settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "deterministic"))
 
 
 @pytest.fixture(autouse=True)
-def private_pool(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every test gets its own empty entropy pool; none can touch the user's."""
-    monkeypatch.setenv("COIN_POOL", str(tmp_path_factory.mktemp("pool")))
+def private_pool(tmp_path_factory: pytest.TempPathFactory) -> Generator[None]:
+    """Every test gets its own empty entropy pool and state directory; none can touch the
+    user's pool or the pending records kept in their state directory. A patcher of its
+    own, so a test's `monkeypatch.undo()` cannot point it back at the user's."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("COIN_POOL", str(tmp_path_factory.mktemp("pool")))
+        patch.setenv("XDG_STATE_HOME", str(tmp_path_factory.mktemp("state")))
+        yield

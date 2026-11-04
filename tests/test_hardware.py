@@ -1,5 +1,7 @@
 import json
 import math
+import os
+import stat
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -10,7 +12,16 @@ import pytest
 
 from coin.archive import ArchiveError, Prediction, load_run
 from coin.circuit import Circuit
-from coin.hardware import JobResult, Submission, discard, pending_runs, recover, submit
+from coin.hardware import (
+    JobResult,
+    Submission,
+    _archived,
+    _keep_result,
+    discard,
+    pending_runs,
+    recover,
+    submit,
+)
 
 NATIVE_COIN = Circuit(1).rz(math.pi / 2, 0).sx(0).rz(math.pi / 2, 0).measure(0, 0)
 CALIBRATION: dict[str, Any] = {"qubits": [], "gates": [], "backend_name": "fake_backend"}
@@ -463,22 +474,129 @@ def test_one_unreadable_record_does_not_hide_the_others(tmp_path: Path) -> None:
     assert [p.record["job_id"] for p in found if p.record] == ["jobX"]
 
 
-def test_a_record_kept_in_the_temp_directory_is_found_and_archived_here(
+def fallback() -> Path:
+    return Path(os.environ["XDG_STATE_HOME"]) / "fairest-coin" / "pending"
+
+
+def test_a_result_the_runs_directory_refuses_is_kept_privately_and_recovered(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import tempfile  # noqa: PLC0415
+    runs = tmp_path / "runs"
 
-    elsewhere = tmp_path / "tmp"
-    elsewhere.mkdir()
+    def refuse_everything(*_args: Any, **_kwargs: Any) -> Path:
+        runs.chmod(0o500)  # the disk turns read-only mid-archive
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr("coin.hardware.write_run", refuse_everything)
+    with pytest.raises(ArchiveError, match="could not be archived"):
+        submit(Submits(), plan(), runs)
+    monkeypatch.undo()
+    runs.chmod(0o700)
+    (kept,) = fallback().glob(".pending-*.json")
+    assert stat.S_IMODE(fallback().stat().st_mode) == 0o700
+    assert stat.S_IMODE(kept.stat().st_mode) == 0o600  # a harvest's shots are secret
+    run = recover(NoFetch, "jobX", runs)
+    assert load_run(run).memory == ("0", "1", "1", "0")
+    assert not list(fallback().glob(".pending-*"))
+
+
+def test_a_fallback_record_for_another_archive_is_not_listed(tmp_path: Path) -> None:
+    runs, other = tmp_path / "runs", tmp_path / "other"
+    with pytest.raises(TimeoutError):
+        submit(Submits(TimeoutError("queue")), plan(), other)
+    (record,) = other.glob(".pending-*.json")
+    fallback().mkdir(parents=True, mode=0o700)
+    record.rename(fallback() / record.name)
+    assert pending_runs(runs) == []
+    assert [p.record["job_id"] for p in pending_runs(other) if p.record] == ["jobX"]
+
+
+def test_a_shared_fallback_directory_is_never_read_or_written(tmp_path: Path) -> None:
+    # On a shared machine anyone could plant a record there, or read a harvest's shots.
     runs = tmp_path / "runs"
     with pytest.raises(TimeoutError):
         submit(Submits(TimeoutError("queue")), plan(), runs)
     (record,) = runs.glob(".pending-*.json")
-    record.rename(elsewhere / record.name)
-    monkeypatch.setattr(tempfile, "gettempdir", lambda: str(elsewhere))
-    run = recover(Submits, "jobX", runs)
-    assert run.parent == runs
-    assert not list(elsewhere.glob(".pending-*"))
+    fallback().mkdir(parents=True)
+    fallback().chmod(0o777)
+    record.rename(fallback() / record.name)
+    assert pending_runs(runs) == []
+    result = Submits().fetch("fake_backend", "jobX", datetime.now(UTC))
+    with pytest.raises(ArchiveError, match="not private to this user"):
+        # The runs directory is gone, so only the fallback is left, and it is refused.
+        _keep_result(tmp_path / "gone" / record.name, {}, result)
+
+
+def test_records_another_user_owns_are_not_trusted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(TimeoutError):
+        submit(Submits(TimeoutError("queue")), plan(), tmp_path)
+    monkeypatch.setattr(os, "getuid", lambda: 99999)  # as if someone else wrote the record
+    (found,) = pending_runs(tmp_path)
+    assert found.record is None
+    assert found.problem == "owned by another user, so not trusted"
+    with pytest.raises(ValueError, match="no pending record"):
+        recover(NoFetch, "jobX", tmp_path)
+
+
+def kept_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A pending record holding job jobX's result, as an interrupted archive leaves it."""
+
+    def interrupted(*_args: Any, **_kwargs: Any) -> Path:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("coin.hardware.write_run", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        submit(Submits(), plan(), tmp_path)
+    monkeypatch.undo()
+    (record,) = tmp_path.glob(".pending-*.json")
+    return record
+
+
+@pytest.mark.parametrize(
+    ("tamper", "problem"),
+    [
+        (lambda r: r["result"].update(job_id="jobY"), "holds a result for job jobY"),
+        (lambda r: r.update(job_id="../jobX"), "is not a job id"),
+        (lambda r: r.update(result=[]), "holds a result for job None"),
+    ],
+    ids=["another job's shots", "a path for an id", "a result that is not one"],
+)
+def test_a_record_that_contradicts_itself_is_never_archived(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, tamper: Callable[..., None], problem: str
+) -> None:
+    record = kept_result(tmp_path, monkeypatch)
+    data = json.loads(record.read_text())
+    tamper(data)
+    record.write_text(json.dumps(data))
+    (found,) = pending_runs(tmp_path)
+    assert found.record is None
+    assert found.problem is not None
+    assert problem in found.problem
+    with pytest.raises(ValueError, match="no pending record"):
+        recover(NoFetch, "jobX", tmp_path)
+    assert not [p for p in tmp_path.iterdir() if p.is_dir()]
+
+
+@pytest.mark.parametrize("junk", ["[]", "3", '"x"', "null"])
+def test_a_record_that_is_not_an_object_does_not_stop_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, junk: str
+) -> None:
+    kept_result(tmp_path, monkeypatch)
+    (tmp_path / ".pending-junk.json").write_text(junk)
+    problems = [p.problem for p in pending_runs(tmp_path) if p.problem]
+    assert problems == [problems[0]]
+    assert "not a pending record" in problems[0]
+    assert load_run(recover(NoFetch, "jobX", tmp_path)).job_id == "jobX"
+
+
+def test_a_job_id_matches_an_archived_run_exactly(tmp_path: Path) -> None:
+    (tmp_path / "2026-11-04-x-abc").mkdir()
+    assert _archived(tmp_path, "abc") is None
+    (tmp_path / "2026-11-04-abc").mkdir()
+    assert _archived(tmp_path, "abc") == tmp_path / "2026-11-04-abc"
+    assert _archived(tmp_path, "x-abc") == tmp_path / "2026-11-04-x-abc"
 
 
 def test_a_record_with_no_job_id_can_be_attached_or_discarded(tmp_path: Path) -> None:
