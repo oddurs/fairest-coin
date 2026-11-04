@@ -42,6 +42,22 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 - [x] [`0083`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0083-leave-room-for-the-squash-suffix-in-commit-subjects.md) Leave room for the squash suffix in commit subjects <sup>chore · p3 · tooling</sup>
 - [x] [`0084`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0084-rebuild-the-v0-4-plan-on-what-v0-2-and-v0-3-found.md) Rebuild the v0.4 plan on what v0.2 and v0.3 found <sup>chore · p0 · chsh</sup>
 
+## v0.3.2 — Hardening, second pass
+
+`··········` 0% · 0 of 7 done · due 2026-11-11
+
+v0.3.2: every defect found by the review of v0.3 as released is fixed: a committed run can
+
+### backlog
+
+- [ ] [`0088`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0088-refuse-a-committed-run-however-its-path-is-written.md) Refuse a committed run however its path is written <sup>bug · p0 · extract</sup>
+- [ ] [`0089`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0089-write-the-archive-as-durably-as-the-pool.md) Write the archive as durably as the pool <sup>bug · p1 · hardware</sup>
+- [ ] [`0090`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0090-trust-only-this-user-s-pending-records-in-recovery.md) Trust only this user's pending records in recovery <sup>bug · p1 · hardware</sup>
+- [ ] [`0091`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0091-say-what-the-min-entropy-estimate-cannot-see.md) Say what the min-entropy estimate cannot see <sup>bug · p1 · extract</sup>
+- [ ] [`0092`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0092-validate-archive-and-mitigation-inputs-and-kill-the-other-mutants.md) Validate archive and mitigation inputs and kill the other mutants <sup>chore · p2 · tooling</sup>
+- [ ] [`0093`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0093-correct-the-essay-where-the-v0-3-review-found-it-wrong.md) Correct the essay where the v0.3 review found it wrong <sup>docs · p2 · essay</sup>
+- [ ] [`0094`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0094-cut-v0-3-2.md) Cut v0.3.2 <sup>chore · p0 · tooling</sup>
+
 ## v0.2 — The real coin
 
 `##########` 100% · 20 of 20 done · due 2026-11-22
