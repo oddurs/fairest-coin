@@ -95,7 +95,10 @@ _MIN_BLOCK = 1_000
 # Extraction spends only this fraction of the estimated min-entropy. Two adversarial reviews
 # built sources a qubit could plausibly produce (telegraph switching with short dwell
 # times, a bias cycling with a drifting or non-integer period, intermittent alternation)
-# on which the estimate overstates the truth by up to 1.77 times. Half covers every one.
+# on which the estimate overstates the truth by up to 1.77 times. Half covers those, and
+# only those: structure the guessers cannot see is not covered by any margin. A third review
+# (v0.3, 2026-11-04) built x[i] = x[i-17] ⊕ x[i-20] ⊕ Bernoulli(0.05), which carries 0.074
+# bits per bit and scores about 0.91: no guesser looks at two earlier bits at once.
 SAFETY = 0.5
 # Predictors: copy (or invert) the bit d back for d up to _MAX_LAG, which sees periods and
 # repeated blocks that long; and online Markov models up to order _MAX_ORDER.
@@ -146,9 +149,12 @@ def min_entropy(bits: npt.ArrayLike) -> float:
     What this cannot be is a guarantee. No estimate from data can tell a deterministic
     process from a random one if the process is clever enough: π's binary digits score
     nearly a bit per bit here, with no entropy at all. The estimate holds for sources whose
-    structure is within reach of these guessers. Hardware noise (bias, drift, switching,
-    memory, periodic disturbance) is; a pseudo-random generator is not. On a steady fair
-    source of 10⁵ bits it gives about 0.91.
+    structure is within reach of these guessers. Bias, drift, switching, periodic
+    disturbance and short memory are. Memory that no single earlier bit reveals is not, nor
+    memory reaching further back than 1,024 bits: each bit the parity of the bits 17 and 20
+    back, flipped 5% of the time, carries 0.074 bits per bit and scores about 0.91, a miss no
+    safety margin covers. Nor is a pseudo-random generator. On a steady fair source of 10⁵
+    bits it gives about 0.91.
     """
     x = as_bits(bits)
     n = len(x)

@@ -3,10 +3,12 @@ id: 91
 uid: 2b892c17-7f82-4538-93b5-46be83d0a2a6
 title: Say what the min-entropy estimate cannot see
 type: bug
-status: backlog
+status: done
 milestone: v0.3.2
+assignee: Oddur Sigurdsson
 created: 2026-11-04
 updated: 2026-11-04
+closed_at: 2026-11-04
 priority: p1
 effort: m
 area: extract
@@ -26,6 +28,14 @@ order limits, or a constant seed.
 
 ## Acceptance criteria
 
-- [ ] extract.py, chapter 3 and the changelog say which structures the estimate can miss, with the parity example
-- [ ] `coin flip`, `coin harvest` and chapter 3 state ε as conditional on the estimate
-- [ ] Tests pin SAFETY against the worst reviewed overstatement, the confidence bound's width, the lag and order limits (a lag-700 copy, an order-12 source), and that seeds come from `secrets`
+- [x] extract.py, chapter 3 and the changelog say which structures the estimate can miss, with the parity example
+- [x] `coin flip`, `coin harvest` and chapter 3 state ε as conditional on the estimate
+- [x] Tests pin SAFETY against the worst reviewed overstatement, the confidence bound's width, the lag and order limits (a lag-700 copy, an order-12 source), and that seeds come from `secrets`
+
+## 2026-11-04
+
+The defect is the claim, so the fix is the claim: SAFETY's comment, min_entropy's docstring and chapter 3 now say the margin covers what the reviews found, not structure the guessers cannot see, with the parity source (0.074 true, about 0.91 estimated, pinned by a test that fails if a guesser ever learns it). The 0.3.0 changelog no longer calls the estimate conservative. coin flip, coin harvest and chapter 3 give ε 'if the estimate holds'. New tests: a lag-700 copy and an order-12 function (seen within reach), the 99.5% bound pinned, SAFETY against the reviewed 1.77x, seeds from secrets in seed_bits and in harvest. Replayed: SAFETY 0.6, _Z 1.645, n+100, lag 512, order 8, constant seed_bits, zero harvest seed: all killed. Not done: a guesser for parities or longer lags; it would change the archived harvest's published estimate and still leave the next structure unseen.
+
+## Result
+
+Code, CLI and chapter 3 say what the estimate cannot see (a two-bit parity scores about 0.91 against a true 0.074, pinned by a test) and give ε as conditional; tests pin SAFETY, the confidence bound, the lag and order reach, and the seed's source; seven mutants killed.

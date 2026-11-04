@@ -1,5 +1,6 @@
 import json
 import os
+import secrets
 import shutil
 from collections.abc import Callable, Sequence
 from dataclasses import replace
@@ -489,3 +490,16 @@ def test_git_tracking_is_judged_by_the_runs_own_repository(
     run_dir = harvest.submit(FakeTransport(calibration), chosen.submission, tmp_path / "runs")
     code, _, err = cli_run(["harvest", "--from-run", str(run_dir)], capsys)
     assert code == 0, err
+
+
+def test_a_harvest_seeds_its_extraction_from_the_operating_system(
+    calibration: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A constant seed would make every batch's bits a fixed function of public shots.
+    monkeypatch.setattr(secrets, "token_bytes", lambda n: b"\xff" * n)
+    chosen = harvest.plan("b", calibration, SHOTS)
+    pool = Pool(tmp_path / "pool")
+    harvest.harvest(FakeTransport(calibration), chosen, tmp_path / "runs", pool, "x")
+    (batch,) = pool.status()
+    packed = np.frombuffer(bytes.fromhex(batch.provenance["seed"]), dtype=np.uint8)
+    assert np.unpackbits(packed)[: batch.provenance["seed_bits"]].all()

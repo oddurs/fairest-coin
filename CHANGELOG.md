@@ -64,7 +64,7 @@ time with a receipt, and an honest account of what no test can prove.
   testing the backend's published readout directly.
 - `coin.extract`:
   - `von_neumann` and `peres`;
-  - `min_entropy`, a conservative estimate that does not assume independence, built from
+  - `min_entropy`, an estimate that does not assume independence, built from
     bias, worst-block, Markov, lag, online-Markov and phase guessers;
   - `toeplitz` and `toeplitz_extract`, which spend half the estimate.
 - `coin.battery`: monobit, block frequency, runs, longest run and serial tests from NIST

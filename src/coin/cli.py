@@ -320,7 +320,7 @@ def _flip_from_pool(args: argparse.Namespace) -> int:
             )
             print(
                 f"  Toeplitz extraction at {flip['entropy_per_bit']:.4f} bits per shot, "
-                f"ε = {flip['epsilon']:.1e}"
+                f"ε = {flip['epsilon']:.1e} if the estimate holds"
             )
         return 0
     width = len(f"{args.shots:,}")
@@ -466,7 +466,7 @@ def _report_harvest(result: harvest.Harvest, *, archived: bool = True) -> None:
     print(f"{'archived' if archived else 'run':<12} {result.run_dir}")
     print(
         f"extracted    {len(e.bits):,} bits: min-entropy estimate {e.estimate:.4f} per shot, "
-        f"half spent (ε = {e.epsilon:.1e})"
+        f"half spent (ε = {e.epsilon:.1e} if the estimate holds)"
     )
     print(f"pooled       batch {result.batch}")
     print(
