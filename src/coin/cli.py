@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from coin import __version__, bell, chipmap, chsh, commitment, harvest, readout
+from coin import __version__, bell, certify, chipmap, chsh, commitment, harvest, readout
 from coin.archive import ArchiveError, load_run
 from coin.chipmap import MAX_SHOTS
 from coin.circuit import Circuit
@@ -191,14 +191,29 @@ def _add_archive_commands(commands: Any) -> None:
     """`coin publish` and `coin recover`: looking after what is already in the archive."""
     publish = commands.add_parser(
         "publish",
-        help="write a spent harvest's extraction record into its archived run",
-        description="Once a harvest's pool batch is spent, write the batch's provenance (its "
-        "seed included) into the run's directory as extraction.json, so that every flip it "
-        "gave can be recomputed from the archive. Refused while any bit is unspent.",
+        help="write a spent batch's extraction record into its archived run",
+        description="Once a harvest's or a certified CHSH run's pool batch is spent, write the "
+        "batch's provenance (its seed included) into the run's directory as extraction.json, "
+        "so that every flip it gave can be recomputed from the archive. Refused while any bit "
+        "is unspent.",
     )
-    publish.add_argument("run_dir", type=Path, metavar="RUN", help="the archived harvest run")
+    publish.add_argument("run_dir", type=Path, metavar="RUN", help="the archived run")
     publish.add_argument("--pool", type=Path, metavar="DIR", help=f"the entropy pool (${POOL_ENV})")
     publish.set_defaults(handler=_publish)
+
+    certify_ = commands.add_parser(
+        "certify",
+        help="hash a CHSH run's outcomes at the rate its S_low certifies, into the pool",
+        description="For a CHSH run whose settings came from the pool, bound S below at the "
+        "run's ε; if S_low exceeds 2, hash its outcome bits at the min-entropy that certifies "
+        "and add them to the pool as a certified batch. Reports the setting bits spent, the "
+        "certified bits made, and the net. Refused once the run is committed to git.",
+    )
+    certify_.add_argument("run_dir", type=Path, metavar="RUN", help="the archived CHSH run")
+    certify_.add_argument(
+        "--pool", type=Path, metavar="DIR", help=f"the entropy pool (${POOL_ENV})"
+    )
+    certify_.set_defaults(handler=_certify)
 
     recover = commands.add_parser(
         "recover",
@@ -403,7 +418,7 @@ def _why_public(path: Path) -> str | None:
                 return None
             return (
                 "is tracked by git, so its shots are public and its bits would be "
-                "predictable; harvest a run that has not been committed"
+                "predictable; use a run that has not been committed"
             )
         detail = listed.stderr.strip() or f"git exited {listed.returncode}"
     # Inside a repository an unanswered question is not a no.
@@ -580,6 +595,19 @@ def _explain(error: BaseException) -> str:
     return "\n".join([str(error), *getattr(error, "__notes__", [])])
 
 
+def _certify(args: argparse.Namespace) -> int:
+    if (why := _why_public(args.run_dir)) is not None:
+        print(f"coin certify: {args.run_dir} {why}", file=sys.stderr)
+        return 1
+    try:
+        result = certify.certify(args.run_dir, Pool(args.pool))
+    except (OSError, ValueError, ArchiveError) as error:
+        print(f"coin certify: {_explain(error)}", file=sys.stderr)
+        return 1
+    print(certify.report(result))
+    return 0
+
+
 def _publish(args: argparse.Namespace) -> int:
     try:
         written = harvest.publish(args.run_dir, Pool(args.pool))
@@ -736,6 +764,12 @@ def _add_chsh(experiments: Any) -> None:
     chsh_.add_argument(
         "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
     )
+    chsh_.add_argument(
+        "--pool",
+        type=Path,
+        metavar="DIR",
+        help=f"the entropy pool --predict draws settings from (${POOL_ENV})",
+    )
     chsh_.set_defaults(handler=_chsh)
 
 
@@ -766,23 +800,41 @@ def _chsh_plan(args: argparse.Namespace) -> int:
             else None
         )
         transport = _transport()
+        calibration = transport.calibration(args.backend)
+        pair = tuple(args.pair) if args.pair else None
+        # Planned first with throwaway settings: anything that would stop the run is found
+        # before a single pool bit is spent on its settings.
         chosen = bell.plan_chsh(
             args.backend,
-            transport.calibration(args.backend),
+            calibration,
             bell.random_choices(args.rounds),
-            pair=tuple(args.pair) if args.pair else None,
+            pair=pair,
             measured=measured_readout,
         )
         print(bell.chsh_summary(chosen))
         if args.dry_run:
-            print("dry run: nothing written, nothing submitted")
+            print("dry run: nothing written, nothing submitted, no pool bit spent")
             return 0
         if chosen.interval is None:
             print("coin run chsh: the chosen pair's readout was not measured", file=sys.stderr)
             return 1
+        choices, sources = certify.settings_from_pool(Pool(args.pool), args.rounds)
+        chosen = bell.plan_chsh(
+            args.backend, calibration, choices, pair=chosen.pair, measured=measured_readout
+        )
+        values = {
+            **chosen.submission.prediction.values,
+            "settings_source": {"pool": sources},
+        }
+        prediction = replace(chosen.submission.prediction, values=values)
+        chosen = replace(chosen, submission=replace(chosen.submission, prediction=prediction))
+        print(f"settings     {len(choices) * certify.BITS_PER_ROUND:,} pool bits spent")
         path = bell.save_prediction(chosen, args.predictions_dir)
     except ImportError as error:
         print(f"coin run: install the ibm extra ({error})", file=sys.stderr)
+        return 1
+    except EmptyPoolError as error:
+        print(f"coin run chsh: the settings come from the pool: {error}", file=sys.stderr)
         return 1
     except (OSError, ValueError, RuntimeError, ArchiveError) as error:
         print(f"coin run chsh: {_explain(error)}", file=sys.stderr)

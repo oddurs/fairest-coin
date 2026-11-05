@@ -3,14 +3,16 @@ id: 43
 uid: 0caec3cd-6cab-4257-b430-9f7fbaa1e077
 title: Choose Bell settings with the coin's own bits
 type: feature
-status: backlog
+status: doing
 milestone: v0.4
+assignee: Oddur Sigurdsson
+claimed: 2026-11-05
 depends_on:
 - 41
 - 32
 - 42
 created: 2026-11-01
-updated: 2026-11-01
+updated: 2026-11-05
 priority: p0
 effort: m
 area: chsh
@@ -43,3 +45,7 @@ it is negative and why.
 - [ ] Certified bits are Toeplitz-extracted at the min-entropy S_low certifies, never credited raw
 - [ ] The run reports setting bits consumed, certified bits produced and the net, and claims no expansion
 - [ ] A batch whose S_low does not exceed 2 credits nothing to the pool
+
+## 2026-11-05
+
+Code first, in its own PR. coin.certify: settings_from_pool (two pool bits a round, choice 2a + b; records batch, offset and count; the bits are spent), certified_rate (Pironio et al. 2010: 1 − log₂(1 + √(2 − S²/4)), 0 at S ≤ 2, 1 at 2√2; 0.268 at 2.5, 0.493 at 2.7), certify (refuses a run whose settings did not come from the pool, one already published, and in the CLI one git tracks; S_low ≤ 2 credits nothing; else the run's two outcome bits a round are Toeplitz-hashed at rate/2 per bit, ⌊n·rate⌋ − 64 bits out, pooled as a certified batch with S, S_low, ε, the rate and the settings' source), and report (setting bits in, certified bits out, net, and that it does not expand randomness). coin run chsh --predict now draws settings from the pool after validating the plan with throwaway settings, so a plan that cannot run spends nothing; --dry-run never spends. coin certify RUN. A certified run, like a harvest, is committed only once its batch is spent (coin publish works for it unchanged). Six mutants replayed, all killed. Still to come: the fresh harvest, the run, its certification (hardware, owner).
