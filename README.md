@@ -60,6 +60,10 @@ On real hardware (an IBM Quantum account; QPU time is spent only with `--submit`
   [Chapter 3](docs/chapters/03-make-it-fair.md) is why the bits need extracting.
 - `coin publish` adds a spent harvest's extraction record to its run, so every flip it gave
   can be checked; `coin recover` archives a job whose run was cut short.
+- `coin run bell` entangles the best-ranked pair of qubits and reads both;
+  `coin predict --pairs` ranks the pairs.
+  [Chapter 4](docs/chapters/04-two-coins-that-agree.md) is what happened, and why agreeing
+  coins prove nothing yet.
 
 ## The chapters
 
@@ -69,7 +73,7 @@ On real hardware (an IBM Quantum account; QPU time is spent only with `--submit`
 | [1. The ideal coin](docs/chapters/01-the-ideal-coin.md) | What is a quantum coin? | written |
 | [2. Predict the real coin](docs/chapters/02-predict-the-real-coin.md) | How does real hardware bend it? | written |
 | [3. Make it fair](docs/chapters/03-make-it-fair.md) | Can a biased coin be fixed? | written |
-| 4. Two coins that agree | What is entanglement for? | upcoming in v0.4 |
+| [4. Two coins that agree](docs/chapters/04-two-coins-that-agree.md) | What is entanglement for? | written |
 | 5. The proof | Can randomness be certified? | upcoming in v0.4 |
 | Epilogue | What would it really take? | upcoming in v1.0 |
 
