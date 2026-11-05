@@ -16,11 +16,10 @@ marks a failure that came after that by giving the exception a `job_id` attribut
 
 import contextlib
 import fcntl
-import glob
 import json
 import os
 import re
-import tempfile
+import stat
 import uuid
 from collections import Counter
 from collections.abc import Callable, Generator, Sequence
@@ -197,22 +196,48 @@ class Pending:
 
 
 def pending_runs(runs_dir: Path) -> list[Pending]:
-    """Every pending record for `runs_dir`, including fallback copies in the temp directory.
+    """Every pending record for `runs_dir`, including copies kept in this user's fallback
+    directory.
 
-    A record that cannot be read is listed with the reason rather than hiding the others.
+    A record that cannot be read, is not a record, or contradicts itself is listed with the
+    reason rather than hiding the others. Records another user owns are never trusted: they
+    could carry any shots and any prediction.
     """
     found = []
-    for directory in (runs_dir, Path(tempfile.gettempdir())):
+    fallback = _fallback_dir()
+    for directory in (runs_dir, *([fallback] if _private(fallback) else [])):
         for path in sorted(directory.glob(".pending-*.json")) if directory.is_dir() else []:
             try:
+                owner = path.lstat().st_uid
                 record = json.loads(path.read_text())
             except (OSError, ValueError) as error:
                 found.append(Pending(path, None, f"unreadable: {error}"))
                 continue
-            # A copy in the temp directory belongs here only if it says so.
+            if owner != os.getuid():
+                found.append(Pending(path, None, "owned by another user, so not trusted"))
+                continue
+            if (problem := _record_problem(record)) is not None:
+                found.append(Pending(path, None, problem))
+                continue
+            # A copy in the fallback directory belongs here only if it says so.
             if directory == runs_dir or Path(record.get("runs_dir", "")) == runs_dir.resolve():
                 found.append(Pending(path, record))
     return found
+
+
+def _record_problem(record: object) -> str | None:
+    """Why `record` cannot be a pending record, or None."""
+    if not isinstance(record, dict):
+        return f"not a pending record: {type(record).__name__}, not an object"
+    job_id = record.get("job_id")
+    if job_id is not None and not (isinstance(job_id, str) and _JOB_ID.fullmatch(job_id)):
+        return f"names {job_id!r}, which is not a job id"
+    if "result" in record:
+        result = record["result"]
+        if not isinstance(result, dict) or result.get("job_id") != job_id:
+            named = result.get("job_id") if isinstance(result, dict) else None
+            return f"is the record for job {job_id} but holds a result for job {named}"
+    return None
 
 
 def recover(
@@ -343,7 +368,10 @@ def _waiting(pending: Path) -> Generator[None]:
         try:
             yield
         finally:
-            lock.unlink(missing_ok=True)
+            # A lock left behind is harmless (`_still_waiting` clears one nobody holds), but
+            # an error here would replace the one saying where the job's result was kept.
+            with contextlib.suppress(OSError):
+                lock.unlink(missing_ok=True)
 
 
 def _still_waiting(pending: Path) -> bool:
@@ -363,8 +391,11 @@ def _still_waiting(pending: Path) -> bool:
 
 
 def _archived(runs_dir: Path, job_id: str) -> Path | None:
-    """The run already archived for this job, if any (directories end in the job id)."""
-    return next((p for p in sorted(runs_dir.glob(f"*-{glob.escape(job_id)}")) if p.is_dir()), None)
+    """The run already archived for this job, if any: `<date>-<job id>`, exactly, so job
+    `abc` is never taken for `x-abc`."""
+    name = re.compile(rf"\d{{4}}-\d{{2}}-\d{{2}}-{re.escape(job_id)}")
+    runs = sorted(runs_dir.iterdir()) if runs_dir.is_dir() else []
+    return next((p for p in runs if p.is_dir() and name.fullmatch(p.name)), None)
 
 
 def _archive_or_keep(
@@ -399,13 +430,48 @@ def _archive_or_keep(
 
 def _keep_result(pending: Path, record: dict[str, Any], result: JobResult) -> Path:
     full = {**record, "job_id": result.job_id, "result": _result_to_json(result)}
-    for target in (pending, Path(tempfile.gettempdir()) / pending.name):
-        try:
-            _write_json_atomic(target, full)
-        except OSError:
-            continue
-        return target
-    raise ArchiveError(f"job {result.job_id}: its result could not be saved anywhere")
+    try:
+        _write_json_atomic(pending, full)
+    except OSError:
+        pass  # the runs directory refuses it; this user's own directory is the last resort
+    else:
+        return pending
+    try:
+        fallback = _make_private(_fallback_dir())
+        target = fallback / pending.name
+        _write_json_atomic(target, full)
+    except (OSError, ArchiveError) as error:
+        raise ArchiveError(
+            f"job {result.job_id}: its result could not be saved anywhere ({error})"
+        ) from error
+    return target
+
+
+def _fallback_dir() -> Path:
+    """Where a job's record goes when the runs directory refuses it: under the user's state
+    directory, never a shared temp directory where another user could read the shots or
+    plant a record, and kept across a reboot."""
+    state = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
+    return Path(state) / "fairest-coin" / "pending"
+
+
+def _private(directory: Path) -> bool:
+    """Whether `directory` is a real directory this user owns that no one else can use."""
+    try:
+        info = directory.lstat()
+    except OSError:
+        return False
+    return stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid() and not info.st_mode & 0o077
+
+
+def _make_private(directory: Path) -> Path:
+    durable.make_directory(directory.parent)
+    with contextlib.suppress(FileExistsError):
+        directory.mkdir(mode=0o700)
+        durable.sync_directory(directory.parent)
+    if not _private(directory):
+        raise ArchiveError(f"{directory} is not private to this user, so nothing is kept there")
+    return directory
 
 
 def _result_to_json(result: JobResult) -> dict[str, Any]:
@@ -435,8 +501,9 @@ def _result_from_json(data: dict[str, Any]) -> JobResult:
 
 
 def _write_json_atomic(path: Path, data: dict[str, Any]) -> None:
-    """Write `path` whole or not at all, and durably: it may be all that is left of a job."""
-    durable.replace(path, json.dumps(data, default=str).encode())
+    """Write `path` whole or not at all, and durably: it may be all that is left of a job.
+    Readable by this user only: a harvest's shots are secret until its batch is spent."""
+    durable.replace(path, json.dumps(data, default=str).encode(), mode=0o600)
 
 
 def _archive(record: dict[str, Any], result: JobResult, runs_dir: Path) -> Path:

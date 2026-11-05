@@ -126,7 +126,10 @@ prediction, and the process that submitted it.
 
 As soon as IBM assigns an id, the record gets it, along with what ran (gate counts and
 sampler options) and when. If archiving fails, the result goes into the record too; if even
-that write fails, a copy goes to the temp directory, where recovery also looks.
+that write fails, a copy goes to `$XDG_STATE_HOME/fairest-coin/pending/` (by default
+`~/.local/state/…`), a directory only you can read, where recovery also looks. Records are
+readable only by you, since a harvest's shots are secret until its batch is spent, and
+recovery ignores any record another user owns or one that contradicts itself.
 
 If a run is cut short after IBM has the job (a timeout, a dropped connection, Ctrl-C, a
 closed terminal), recover it with `coin recover`:
