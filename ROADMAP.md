@@ -41,13 +41,9 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 
 ## v0.3.2 — Hardening, second pass
 
-`#########·` 86% · 6 of 7 done · due 2026-11-11
+`##########` 100% · 7 of 7 done · due 2026-11-11
 
 v0.3.2: every defect found by the review of v0.3 as released is fixed: a committed run can
-
-### in progress
-
-- [ ] [`0094`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0094-cut-v0-3-2.md) Cut v0.3.2 <sup>chore · p0 · tooling</sup>
 
 ### done
 
@@ -57,6 +53,7 @@ v0.3.2: every defect found by the review of v0.3 as released is fixed: a committ
 - [x] [`0091`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0091-say-what-the-min-entropy-estimate-cannot-see.md) Say what the min-entropy estimate cannot see <sup>bug · p1 · extract</sup>
 - [x] [`0092`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0092-validate-archive-and-mitigation-inputs-and-kill-the-other-mutants.md) Validate archive and mitigation inputs and kill the other mutants <sup>chore · p2 · tooling</sup>
 - [x] [`0093`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0093-correct-the-essay-where-the-v0-3-review-found-it-wrong.md) Correct the essay where the v0.3 review found it wrong <sup>docs · p2 · essay</sup>
+- [x] [`0094`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0094-cut-v0-3-2.md) Cut v0.3.2 <sup>chore · p0 · tooling</sup>
 
 ## v0.2 — The real coin
 
