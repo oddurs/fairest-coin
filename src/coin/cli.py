@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from coin import __version__, chipmap, harvest, readout
+from coin import __version__, chipmap, chsh, harvest, readout
 from coin.archive import ArchiveError, load_run
 from coin.chipmap import MAX_SHOTS
 from coin.circuit import Circuit
@@ -99,6 +99,19 @@ def _parser() -> argparse.ArgumentParser:
         "--measurement-decay",
         action="store_true",
         help="also apply decay over the readout window (the double-counting alternative)",
+    )
+    predict.add_argument(
+        "--pairs",
+        action="store_true",
+        help="rank coupled qubit pairs by the CHSH value S the noise model predicts",
+    )
+    predict.add_argument(
+        "--readout",
+        nargs=2,
+        type=Path,
+        metavar=("ZERO_RUN", "ONE_RUN"),
+        help="with --pairs: archived prepare-|0⟩ and prepare-|1⟩ readout runs, whose measured "
+        "readout replaces the published one",
     )
     predict.set_defaults(handler=_predict)
 
@@ -476,11 +489,17 @@ def _report_harvest(result: harvest.Harvest, *, archived: bool = True) -> None:
 
 
 def _predict(args: argparse.Namespace) -> int:
+    if args.readout and not args.pairs:
+        print("coin predict: --readout is for --pairs", file=sys.stderr)
+        return 2
     try:
-        model = model_from_calibration(_read_calibration(args.calibration))
+        calibration = _read_calibration(args.calibration)
+        model = model_from_calibration(calibration)
     except (OSError, ValueError, ArchiveError) as error:
         print(f"coin predict: cannot read calibration: {error}", file=sys.stderr)
         return 1
+    if args.pairs:
+        return _predict_pairs(calibration, args.readout)
     tails = {
         q: predict_tails(noise, NATIVE_COIN, measurement_decay=args.measurement_decay)
         for q, noise in model.qubits.items()
@@ -490,6 +509,32 @@ def _predict(args: argparse.Namespace) -> int:
         print(f"{q:>5}  {p:8.5f}  {p - 0.5:+7.2%}")
     for q, reason in sorted(model.excluded.items()):
         print(f"{q:>5}  excluded: {reason}")
+    return 0
+
+
+# How many of the best pairs `coin predict --pairs` lists.
+_TOP_PAIRS = 5
+
+
+def _predict_pairs(calibration: dict[str, Any], readout_runs: list[Path] | None) -> int:
+    try:
+        measured_readout = (
+            readout.measured(load_run(readout_runs[0]), load_run(readout_runs[1]))
+            if readout_runs
+            else None
+        )
+    except (OSError, ValueError, ArchiveError) as error:
+        print(f"coin predict: cannot read the readout runs: {error}", file=sys.stderr)
+        return 1
+    ranked = chsh.rank_pairs(calibration, measured_readout)
+    print(f"{len(ranked)} coupled pairs scored; the best {min(_TOP_PAIRS, len(ranked))}:")
+    print("    pair  predicted S  cz error  readout")
+    for score in ranked[:_TOP_PAIRS]:
+        a, b = score.pair
+        print(
+            f"{a:>4}-{b:<4} {score.s:11.4f}  {score.cz_error:8.5f}  "
+            f"{score.readout_source[0]}, {score.readout_source[1]}"
+        )
     return 0
 
 
