@@ -1,5 +1,6 @@
 import dataclasses
 import gzip
+import json
 import shutil
 from collections import Counter
 from datetime import UTC, datetime, timedelta, timezone
@@ -309,3 +310,31 @@ def test_a_record_added_later_is_written_whole_and_only_once(tmp_path: Path) -> 
     with pytest.raises(archive.ArchiveError, match="not a record"):
         archive.add_record(run, archive.META, {})
     assert archive.load_run(run).job_id  # the run itself is untouched and still loads
+
+
+def test_counts_that_miss_the_shots_are_refused_without_memory(tmp_path: Path) -> None:
+    # With memory the memory check would catch it too; without, only the counts check can.
+    with pytest.raises(ArchiveError, match="counts sum to 5"):
+        write_run(tmp_path, make_run(counts={"00": 5}, memory=None))
+
+
+def test_a_negative_count_is_refused(tmp_path: Path) -> None:
+    directory = write_run(tmp_path, make_run(memory=None))
+    overwrite(on_disk(directory, "counts.json"), '{"00": 7, "01": -1}')  # still sums to 6
+    with pytest.raises(ArchiveError, match="non-negative"):
+        load_run(directory)
+
+
+def test_a_prediction_and_a_reason_for_none_are_refused(tmp_path: Path) -> None:
+    with pytest.raises(ArchiveError, match="a prediction and a no_prediction_reason"):
+        write_run(tmp_path, make_run(no_prediction_reason="none was possible"))
+
+
+@pytest.mark.parametrize("qubits", [[3, True], [3, "7"], [3, 7.0]])
+def test_qubits_must_be_integers(tmp_path: Path, qubits: list[object]) -> None:
+    directory = write_run(tmp_path, make_run())
+    meta = on_disk(directory, "meta.json")
+    data = json.loads(meta.read_text())
+    overwrite(meta, json.dumps({**data, "qubits": qubits}))
+    with pytest.raises(ArchiveError, match="list of integers"):
+        load_run(directory)

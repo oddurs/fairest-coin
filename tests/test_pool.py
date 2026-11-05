@@ -1,6 +1,7 @@
 import json
 import subprocess
 import sys
+from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 
 import numpy as np
@@ -8,7 +9,7 @@ import pytest
 
 import coin.durable
 import coin.pool
-from coin.pool import POOL_ENV, EmptyPoolError, Pool, default_path
+from coin.pool import POOL_ENV, Draw, EmptyPoolError, Pool, default_path, receipt
 
 
 def filled(path: Path, *sizes: int) -> Pool:
@@ -204,3 +205,33 @@ def test_a_batch_with_no_job_id_falls_back_to_its_run(tmp_path: Path) -> None:
     pool.add([1, 0], {"run": "2026-11-02-abc"}, label="abc")
     with pytest.raises(ValueError, match="run 2026-11-02-abc is already pooled"):
         pool.add([0, 1], {"run": "2026-11-02-abc"}, label="abc")
+
+
+def test_two_batches_never_share_a_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Two adds in one microsecond with one label would name the same batch; the second must
+    # not overwrite the first's bits, some of which may already be spent.
+    class Frozen(datetime):
+        @classmethod
+        def now(cls, tz: tzinfo | None = None) -> "Frozen":
+            return cls(2026, 11, 4, 12, 0, tzinfo=UTC)
+
+    monkeypatch.setattr(coin.pool, "datetime", Frozen)
+    pool = Pool(tmp_path)
+    pool.add([1, 1], {}, label="a")
+    with pytest.raises(ValueError, match="already exists"):
+        pool.add([0], {}, label="a")
+    assert [b.total for b in pool.status()] == [2]
+
+
+def test_files_that_are_not_batches_are_ignored(tmp_path: Path) -> None:
+    pool = filled(tmp_path, 4)
+    (tmp_path / "notes.bits").write_bytes(b"\x00")
+    assert [b.total for b in pool.status()] == [4]
+    assert len(pool.take(4)[0].bits) == 4
+
+
+@pytest.mark.parametrize(("bit", "face"), [(0, "HEADS"), (1, "TAILS")])
+def test_a_receipt_names_the_face_its_bit_gives(bit: int, face: str) -> None:
+    # Heads is 0 and tails is 1, everywhere (docs/conventions.md).
+    draw = Draw(bits=np.array([bit], dtype=np.uint8), batch="b", offset=0, provenance={})
+    assert receipt(draw, datetime.now(UTC))["outcome"] == face

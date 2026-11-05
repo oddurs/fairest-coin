@@ -184,3 +184,12 @@ def _slow_longest_run(x: np.ndarray) -> float:
 def test_longest_run_matches_the_slow_reference(seed: int) -> None:
     x = (np.random.default_rng(seed).random(1000) < 0.6).astype(np.uint8)
     assert longest_run(x) == pytest.approx(_slow_longest_run(x), abs=EXACT)
+
+
+@pytest.mark.parametrize("shift", range(10))
+def test_serial_wraps_the_sequence_around(shift: int) -> None:
+    # §2.11 counts patterns on the sequence joined end to start, so every rotation of the
+    # worked example has the same patterns and the same p-values.
+    x = np.roll(np.array([int(c) for c in "0011011101"], dtype=np.uint8), shift)
+    p1, p2 = serial(x, m=3)
+    assert (round(p1, 6), round(p2, 6)) == (0.808792, 0.670320)

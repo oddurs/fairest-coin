@@ -503,3 +503,41 @@ def test_a_harvest_seeds_its_extraction_from_the_operating_system(
     (batch,) = pool.status()
     packed = np.frombuffer(bytes.fromhex(batch.provenance["seed"]), dtype=np.uint8)
     assert np.unpackbits(packed)[: batch.provenance["seed_bits"]].all()
+
+
+def test_the_forecast_is_the_worst_of_five_simulated_coins() -> None:
+    # At 5,000 shots of a 60% coin the five seeds give 1,394, 1,378, 1,485, 1,518 and 1,410
+    # bits: the worst is not the first, and not the best.
+    shots, p = 5_000, 0.6
+    each = [
+        secure_length(
+            shots,
+            SAFETY * min_entropy((np.random.default_rng(s).random(shots) < p).astype(np.uint8)),
+        )
+        for s in range(5)
+    ]
+    assert min(each) not in (each[0], max(each))
+    assert harvest.forecast_bits(shots, p) == min(each)
+
+
+def test_only_a_one_qubit_run_has_shots_to_extract() -> None:
+    from tests.test_archive import make_run  # noqa: PLC0415 - a two-qubit run
+
+    with pytest.raises(ValueError, match="measured 2 qubits, not one"):
+        harvest.shots_of(make_run())
+
+
+@pytest.mark.parametrize(("expected", "refused"), [(999, True), (1_000, False)])
+def test_a_harvest_needs_a_forecast_of_1000_bits(
+    calibration: dict[str, Any], tmp_path: Path, expected: int, refused: bool
+) -> None:
+    transport = FakeTransport(calibration)
+    chosen = replace(harvest.plan("b", calibration, SHOTS), expected_bits=expected)
+    pool = Pool(tmp_path / "pool")
+    if refused:
+        with pytest.raises(ValueError, match="under the 1,000"):
+            harvest.harvest(transport, chosen, tmp_path / "runs", pool, "x")
+        assert not (tmp_path / "runs").exists()
+    else:
+        harvest.harvest(transport, chosen, tmp_path / "runs", pool, "x")
+        assert pool.status()

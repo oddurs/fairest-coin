@@ -123,6 +123,14 @@ def test_the_docstring_says_mitigation_acts_on_distributions_not_bits() -> None:
         (lambda: mitigate({"0": math.nan, "1": 0.5}, {0: Readout(0, 0)}), "frequencies"),
         (lambda: mitigate({"0": 1.2, "1": -0.2}, {0: Readout(0, 0)}), "frequencies"),
         (lambda: mitigate({"2": 1.0}, {0: Readout(0, 0)}), "0 and 1"),
+        # Every value at most 1 and summing to 1, but one negative: not a distribution.
+        (
+            lambda: mitigate(
+                {"00": 0.6, "01": 0.6, "10": -0.2, "11": 0.0}, {0: Readout(0, 0), 1: Readout(0, 0)}
+            ),
+            "frequencies",
+        ),
+        (lambda: mitigate({"0": 0.5, "1": 0.5}, {0: Readout(0, 0), 1: Readout(0, 0)}), "each"),
         (lambda: mitigate({"0 1": 1.0}, {0: Readout(0, 0)}), "0 and 1"),
         (lambda: mitigate({"0" * 21: 1.0}, {}), "too wide"),
         (lambda: readout_from_counts({}, {"1": 1}), "at least one shot"),
