@@ -114,13 +114,16 @@ A Bell test run on real hardware, with the measurement settings chosen by the v0
 
 ### backlog
 
-- [ ] [`0042`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0042-predict-commit-then-measure-s-on-hardware.md) Predict, commit, then measure S on hardware <sup>feature · p0 · chsh</sup>
 - [ ] [`0043`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0043-choose-bell-settings-with-the-coin-s-own-bits.md) Choose Bell settings with the coin's own bits <sup>feature · p0 · chsh</sup>
 - [ ] [`0044`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0044-attach-the-batch-s-s-value-to-every-receipt.md) Attach the batch's S value to every receipt <sup>feature · p1 · cli</sup>
 - [ ] [`0045`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0045-draw-the-correlations-and-s-against-its-bounds.md) Draw the correlations and S against its bounds <sup>feature · p2 · figures</sup>
 - [ ] [`0046`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0046-write-chapter-4-two-coins-that-agree.md) Write chapter 4: two coins that agree <sup>docs · p0 · essay</sup>
 - [ ] [`0047`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0047-write-chapter-5-the-proof.md) Write chapter 5: the proof <sup>docs · p0 · essay</sup>
 - [ ] [`0048`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0048-cut-v0-4-0.md) Cut v0.4.0 <sup>chore · p0 · tooling</sup>
+
+### in progress
+
+- [ ] [`0042`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0042-predict-commit-then-measure-s-on-hardware.md) Predict, commit, then measure S on hardware <sup>feature · p0 · chsh</sup>
 
 ### done
 

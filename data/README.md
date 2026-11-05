@@ -118,6 +118,18 @@ It holds the batch's provenance as the pool recorded it:
 
 `coin.extract.toeplitz` of the run's shots with that seed reproduces the batch bit for bit.
 
+## Predictions committed before their run
+
+`data/predictions/` holds predictions that must be in git before the job they predict runs:
+so far, the CHSH test (`coin run chsh --predict`). Each file is gzipped JSON holding the
+whole plan (backend, pair, the calibration snapshot, every round's setting) and the
+prediction, with its 95% interval and what the interval assumes. `coin run chsh --submit
+--prediction FILE` refuses a file git does not track or that changed since its last commit,
+runs exactly that plan, and records the commit in the run's `prediction.json` as
+`committed_as`. Pull requests are squash-merged, so the prediction goes to `main` in its own
+pull request first; the run is submitted from `main` after it, and its result merges later,
+leaving the prediction's commit an ancestor of the result's.
+
 ## Jobs that never finished archiving
 
 Before anything is submitted, `coin.hardware.submit` writes a pending record,

@@ -126,6 +126,32 @@ def within_three_sigma(run: Run) -> tuple[int, int]:
     return hits, len(predicted)
 
 
+@dataclass(frozen=True)
+class ReadoutCounts:
+    """One qubit's readout as measured: misreads out of shots, for each prepared state."""
+
+    ones_given_0: int  # prepared |0⟩, read 1
+    shots_0: int
+    zeros_given_1: int  # prepared |1⟩, read 0
+    shots_1: int
+
+    @property
+    def readout(self) -> Readout:
+        return Readout(self.ones_given_0 / self.shots_0, self.zeros_given_1 / self.shots_1)
+
+
+def measured_counts(prepared_0: Run, prepared_1: Run) -> dict[int, ReadoutCounts]:
+    """Each qubit's misreads and shots in the two runs: `measured`, with what it rests on."""
+    readout = measured(prepared_0, prepared_1)
+    ones_0, ones_1 = tails_by_qubit(prepared_0), tails_by_qubit(prepared_1)
+    return {
+        q: ReadoutCounts(
+            ones_0[q], prepared_0.shots, prepared_1.shots - ones_1[q], prepared_1.shots
+        )
+        for q in readout
+    }
+
+
 def measured(prepared_0: Run, prepared_1: Run) -> dict[int, Readout]:
     """Each qubit's readout as the two jobs saw it: p(1|0) from one, p(0|1) from the other."""
     for run, prepare in ((prepared_0, 0), (prepared_1, 1)):
