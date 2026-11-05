@@ -21,6 +21,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote, quote_plus
 
+import numpy as np
 from qiskit import qasm3, transpile
 from qiskit_ibm_runtime import QiskitRuntimeService
 from qiskit_ibm_runtime.executor_sampler import Sampler
@@ -64,20 +65,29 @@ class IBMTransport:
         properties = self._guard(lambda: self._service.backend(backend).properties().to_dict())
         return json.loads(json.dumps(properties, default=str))
 
-    def run(
+    def run(  # noqa: PLR0913 - each argument is a separate fact about the job
         self,
         backend: str,
         qasm: str,
         layout: Sequence[int],
         shots: int,
         on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+        *,
+        parameter_values: Sequence[Sequence[float]] | None = None,
     ) -> JobResult:
+        if parameter_values is not None and len(parameter_values) != shots:
+            raise IBMError(f"{len(parameter_values)} parameter rows for {shots} shots")
         target, isa, executed = self._guard(lambda: self._map(backend, qasm, layout))
         sampler = self._guard(lambda: sampler_for(target))
         options = _plain(sampler.options)
+        # A sweep binds one row per shot: one shot of each, in row order.
+        pub: Any = (
+            isa if parameter_values is None else (isa, np.asarray(parameter_values, dtype=float))
+        )
+        per_pub = shots if parameter_values is None else 1
         submitted_at = datetime.now(UTC)
         try:
-            job = self._guard(lambda: sampler.run([isa], shots=shots))
+            job = self._guard(lambda: sampler.run([pub], shots=per_pub))
             job_id = self._guard(job.job_id)
         except BaseException as error:
             # The job may already be on the hardware without its id reaching us.
@@ -241,7 +251,15 @@ def _encodings(secret: str) -> set[str]:
     return forms | {form.lower() for form in forms if "%" in form}
 
 
-type _Instruction = tuple[str, tuple[float, ...], tuple[int, ...], tuple[int, ...]]
+type _Instruction = tuple[str, tuple[float | str, ...], tuple[int, ...], tuple[int, ...]]
+
+
+def _angle(parameter: Any) -> float | str:
+    """A gate angle to compare: rounded if a number, by name if a sweep's parameter."""
+    try:
+        return round(float(parameter), 12)
+    except TypeError:  # an unbound Parameter has no value yet, only its name
+        return str(parameter)
 
 
 def _by_wire(instructions: list[_Instruction]) -> dict[tuple[str, int], list[_Instruction]]:
@@ -273,6 +291,6 @@ def _instructions(circuit: Any, physical: list[int]) -> list[_Instruction]:
             continue
         qubits = tuple(physical[circuit.find_bit(q).index] for q in instruction.qubits)
         clbits = tuple(circuit.find_bit(c).index for c in instruction.clbits)
-        angles = tuple(round(float(p), 12) for p in instruction.operation.params)
+        angles = tuple(_angle(p) for p in instruction.operation.params)
         found.append((name, angles, qubits, clbits))
     return found

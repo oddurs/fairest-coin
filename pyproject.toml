@@ -43,6 +43,8 @@ ignore = ["PLR2004", "RUF002", "RUF003"]
 [tool.ruff.lint.per-file-ignores]
 # `I` is the identity matrix in every textbook; renaming it would hurt more than it helps.
 "src/coin/gates.py" = ["E741"]
+# Fake transports mirror Transport.run's signature, argument for argument.
+"tests/*" = ["PLR0913"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

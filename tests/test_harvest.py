@@ -46,6 +46,8 @@ class FakeTransport:
         layout: Sequence[int],
         shots: int,
         on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+        *,
+        parameter_values: Sequence[Sequence[float]] | None = None,
     ) -> HardwareJobResult:
         self.runs.append((backend, tuple(layout), shots))
         bits = np.random.default_rng(1).random(shots) < self._p

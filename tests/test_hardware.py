@@ -44,6 +44,8 @@ class FakeTransport:
         layout: Sequence[int],
         shots: int,
         on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+        *,
+        parameter_values: Sequence[Sequence[float]] | None = None,
     ) -> JobResult:
         self.submitted.append((backend, qasm, list(layout), shots))
         now = datetime.now(UTC)
@@ -208,6 +210,8 @@ class LostAfterSubmission(FakeTransport):
         layout: Sequence[int],
         shots: int,
         on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+        *,
+        parameter_values: Sequence[Sequence[float]] | None = None,
     ) -> JobResult:
         self.submitted.append((backend, qasm, list(layout), shots))
         setattr(self.failure, "job_id", "lostjob42")  # noqa: B010 - as IBMTransport does
@@ -261,6 +265,8 @@ def test_a_failure_before_submission_leaves_nothing(tmp_path: Path) -> None:
             layout: Sequence[int],
             shots: int,
             on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+            *,
+            parameter_values: Sequence[Sequence[float]] | None = None,
         ) -> JobResult:
             raise ConnectionError("never reached IBM")
 
@@ -285,6 +291,8 @@ def test_the_record_names_the_job_while_it_runs(tmp_path: Path) -> None:
             layout: Sequence[int],
             shots: int,
             on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+            *,
+            parameter_values: Sequence[Sequence[float]] | None = None,
         ) -> JobResult:
             assert on_submitted is not None
             on_submitted("fakejob0001", details())
@@ -308,6 +316,8 @@ def test_a_job_named_by_the_transport_is_kept_even_if_the_error_does_not_name_it
             layout: Sequence[int],
             shots: int,
             on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+            *,
+            parameter_values: Sequence[Sequence[float]] | None = None,
         ) -> JobResult:
             assert on_submitted is not None
             on_submitted("namedjob5", details())
@@ -385,6 +395,8 @@ class Submits(FakeTransport):
         layout: Sequence[int],
         shots: int,
         on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+        *,
+        parameter_values: Sequence[Sequence[float]] | None = None,
     ) -> JobResult:
         assert on_submitted is not None
         self.reported = details()

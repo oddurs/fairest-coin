@@ -17,12 +17,13 @@ spike 0069 found published p(1|0) correlates only +0.46 with measured.
 """
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from coin.circuit import Circuit, Gate, Measure
-from coin.compile import lower
+from coin.compile import lower, zxzxz
+from coin.gates import matrix
 from coin.noise import (
     VIRTUAL_GATES,
     GateCalibration,
@@ -55,6 +56,38 @@ def circuit(a: float, b: float) -> Circuit:
     return Circuit(2).h(0).cx(0, 1).ry(-a, 0).ry(-b, 1).measure(0, 0).measure(1, 1)
 
 
+def lowered_circuits() -> dict[tuple[int, int], Circuit]:
+    """Each setting's circuit, lowered to its shortest native form."""
+    return {(i, j): lower(circuit(a, b)) for i, a in enumerate(ALICE) for j, b in enumerate(BOB)}
+
+
+def setting_circuits() -> dict[tuple[int, int], Circuit]:
+    """The four settings' circuits on one native skeleton, so one program can sweep them.
+
+    The Bell pair is H on each qubit, a `cz`, and H on Bob's again; Alice then reads along
+    RY(−a) and Bob along RY(−b). Everything after the `cz` is one unitary per qubit, written
+    as rz·sx·rz·sx·rz whatever it is, so the four circuits differ only in `rz` angles, which
+    cost nothing on hardware and can be chosen shot by shot.
+    """
+    prefix = lower(Circuit(2).h(0).h(1)).ops
+    hadamard = matrix(Gate("h", (0,)))
+    out = {}
+    for i, a in enumerate(ALICE):
+        for j, b in enumerate(BOB):
+            alice = matrix(Gate("ry", (0,), (-a,)))
+            bob = matrix(Gate("ry", (0,), (-b,))) @ hadamard
+            ops = (
+                *prefix,
+                Gate("cz", (0, 1)),
+                *zxzxz(alice, 0),
+                *zxzxz(bob, 1),
+                Measure(0, 0),
+                Measure(1, 1),
+            )
+            out[i, j] = Circuit(2, ops)
+    return out
+
+
 def correlation(distribution: Mapping[str, float]) -> float:
     """E = P(the two bits agree) − P(they differ), for two-bit outcome strings."""
     return sum(p if outcome[0] == outcome[1] else -p for outcome, p in distribution.items())
@@ -69,6 +102,24 @@ def s_value(correlations: Mapping[tuple[int, int], float]) -> float:
 # Outcome counts for each setting pair, keyed (Alice's setting, Bob's setting), with outcome
 # strings "<Bob's bit><Alice's bit>" as the circuit measures them.
 type Counts = Mapping[tuple[int, int], Mapping[str, int]]
+
+
+# The order a swept run numbers its settings in: choice k runs SETTINGS[k].
+SETTINGS: tuple[tuple[int, int], ...] = ((0, 0), (0, 1), (1, 0), (1, 1))
+
+
+def counts_by_setting(memory: Sequence[str], choices: str) -> dict[tuple[int, int], dict[str, int]]:
+    """Each setting pair's outcome counts from a swept run's shots and the choice behind each.
+
+    `choices` holds one digit per shot, k meaning SETTINGS[k], as the archive keeps it.
+    """
+    if len(memory) != len(choices):
+        raise ValueError(f"{len(memory)} shots but {len(choices)} choices")
+    counts: dict[tuple[int, int], dict[str, int]] = {setting: {} for setting in SETTINGS}
+    for outcome, k in zip(memory, choices, strict=True):
+        tally = counts[SETTINGS[int(k)]]
+        tally[outcome] = tally.get(outcome, 0) + 1
+    return counts
 
 
 @dataclass(frozen=True)
@@ -97,6 +148,18 @@ class Estimate:
             raise ValueError(f"epsilon must lie in (0, 1), got {epsilon}")
         margin = math.sqrt(math.log(1 / epsilon) / (2 * self.rounds))
         return 8 * (self.wins / self.rounds - margin) - 4
+
+
+def correlations_by_setting(counts: Counts) -> dict[tuple[int, int], float]:
+    """Each setting's correlation E = P(agree) − P(differ) from its counts."""
+    out = {}
+    for setting, outcomes in counts.items():
+        n = sum(outcomes.values())
+        if n < 1:
+            raise ValueError(f"settings {setting} have no shots")
+        agree = sum(k for outcome, k in outcomes.items() if outcome[0] == outcome[1])
+        out[setting] = (2 * agree - n) / n
+    return out
 
 
 def estimate(counts: Counts) -> Estimate:
@@ -139,7 +202,7 @@ def predict_distribution(
     readout: tuple[Readout, Readout],
     circuit: Circuit,
 ) -> dict[str, float]:
-    """What a two-qubit circuit, lowered here, reads out on these two qubits.
+    """What a native two-qubit circuit reads out on these two qubits.
 
     Relaxation and depolarizing follow every gate, the `cz`'s sized for four dimensions;
     then each qubit's bit is misread by its readout. Virtual qubit 0 is Alice's, 1 Bob's.
@@ -160,18 +223,25 @@ def predict_distribution(
         relaxation = thermal_relaxation(noise[q].t1_ns, noise[q].t2_ns, cal.length_ns, q)
         return (*relaxation, depolarizing(gate_depolarizing(cal.error, relaxation), q))
 
-    true = probabilities(lower(circuit), channels)
+    true = probabilities(circuit, channels)
     return apply_readout(true, {0: readout[0], 1: readout[1]})
 
 
 def predict_s(
-    alice: QubitNoise, bob: QubitNoise, cz: GateCalibration, readout: tuple[Readout, Readout]
+    alice: QubitNoise,
+    bob: QubitNoise,
+    cz: GateCalibration,
+    readout: tuple[Readout, Readout],
+    circuits: Mapping[tuple[int, int], Circuit] | None = None,
 ) -> float:
-    """S for the CHSH test on these two qubits, from their noise and readout."""
+    """S for the CHSH test on these two qubits, from their noise and readout.
+
+    `circuits` are the four settings' native circuits, the shortest lowering by default;
+    a per-shot sweep runs `setting_circuits` instead, which has more pulses.
+    """
     correlations = {
-        (i, j): correlation(predict_distribution(alice, bob, cz, readout, circuit(a, b)))
-        for i, a in enumerate(ALICE)
-        for j, b in enumerate(BOB)
+        setting: correlation(predict_distribution(alice, bob, cz, readout, native))
+        for setting, native in (circuits or lowered_circuits()).items()
     }
     return s_value(correlations)
 
