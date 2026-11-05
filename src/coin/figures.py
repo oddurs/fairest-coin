@@ -23,6 +23,7 @@ from matplotlib.colors import LinearSegmentedColormap, Normalize
 from matplotlib.figure import Figure
 from matplotlib.typing import RcKeyType
 
+from coin import chsh
 from coin.archive import load_run
 from coin.battery import ALPHA, battery
 from coin.chipmap import compare, tails_by_qubit
@@ -34,6 +35,8 @@ FIGURES_DIR = Path("docs/figures")
 
 FIRST_RUN = "2026-11-01-dbjsk29ffo6c73baaosg"
 CHIP_MAP_RUN = "2026-11-02-dbjuh5d6p51s73cljo60"
+# The CHSH test predicted, committed in c86a39c, then run (0042).
+CHSH_RUN = "2026-11-05-dbmfqed8ft8s738upl80"
 
 # One grey for text, axes and neutral marks: about 4.3:1 against both GitHub's white
 # and its dark #0d1117, because one SVG has to read on either background.
@@ -401,6 +404,115 @@ def extraction(runs: Path) -> Figure:
     return fig
 
 
+def chsh_test(runs: Path) -> Figure:
+    """The CHSH run: each setting's correlation, and S against both bounds."""
+    run = load_run(runs / CHSH_RUN)
+    if run.prediction is None or run.memory is None:
+        raise ValueError(f"{runs / CHSH_RUN}: a CHSH run carries a prediction and its shots")
+    predicted = run.prediction.values
+    counts = chsh.counts_by_setting(run.memory, run.extra["choices"])
+    result = chsh.estimate(counts)
+    measured = chsh.correlations_by_setting(counts)
+    epsilon = predicted["epsilon"]
+    s_low = result.lower_bound(epsilon)
+
+    fig = Figure(figsize=(7.2, 3.4))
+    left, right = fig.subplots(1, 2, gridspec_kw={"width_ratios": [1.15, 1]})
+
+    labels = [f"E(a{i}, b{j})" for i, j in chsh.SETTINGS]
+    for y, setting in enumerate(chsh.SETTINGS):
+        e = measured[setting]
+        n = sum(counts[setting].values())
+        # A correlation is a binomial mean of ±1 outcomes: standard error √((1 − E²)/n).
+        left.errorbar(
+            e,
+            y,
+            xerr=math.sqrt((1 - e * e) / n),
+            fmt="o",
+            color=MEASURED,
+            capsize=3,
+            ms=6,
+            label=f"measured, 1{SIGMA}" if y == 0 else None,
+        )
+        expected = predicted["correlations"][f"{setting[0]}{setting[1]}"]
+        left.plot(
+            expected,
+            y,
+            marker="|",
+            ls="none",
+            color=PREDICTED,
+            ms=14,
+            mew=2,
+            label="predicted" if y == 0 else None,
+        )
+    left.axvline(0, color=INK, lw=1, ls="--", zorder=0)
+    left.set_yticks(range(len(labels)), labels)
+    left.invert_yaxis()
+    left.set_xlim(-1, 1)
+    left.set_xlabel(f"correlation: P(agree) {MINUS} P(differ)")
+    left.set_title("each setting", loc="left", fontsize=10)
+    left.legend(loc="lower right", fontsize=8, frameon=False)
+
+    low, high = predicted["interval"]
+    right.axhspan(low, high, color=PREDICTED, alpha=0.18, lw=0)
+    right.errorbar(0, result.s, yerr=result.standard_error, fmt="o", color=MEASURED, capsize=4)
+    right.plot([-0.25, 0.25], [s_low, s_low], color=MEASURED, lw=2, ls=":")
+    for value, name in (
+        (chsh.CLASSICAL_BOUND, "classical bound 2"),
+        (chsh.TSIRELSON, "Tsirelson 2√2"),
+    ):
+        right.axhline(value, color=INK, lw=1, ls="--")
+        right.annotate(
+            name,
+            (1, value),
+            xycoords=("axes fraction", "data"),
+            xytext=(-2, 3),
+            textcoords="offset points",
+            ha="right",
+            fontsize=8,
+        )
+    right.annotate(
+        f"S = {result.s:.3f} ± {result.standard_error:.3f}",
+        (0, result.s),
+        xytext=(10, 4),
+        textcoords="offset points",
+        fontsize=9,
+        color=MEASURED,
+    )
+    right.annotate(
+        f"S_low = {s_low:.3f}",
+        (0.25, s_low),
+        xytext=(4, -10),
+        textcoords="offset points",
+        fontsize=8,
+        color=MEASURED,
+    )
+    right.annotate(
+        f"predicted, 95%: {low:.3f} to {high:.3f}",
+        (-0.95, low),
+        xytext=(0, -11),
+        textcoords="offset points",
+        fontsize=8,
+        color=PREDICTED,
+    )
+    right.set_xlim(-1, 1)
+    right.set_xticks([])
+    right.set_ylim(1.8, 3.0)
+    right.set_ylabel("S")
+    right.set_title("S against its bounds", loc="left", fontsize=10)
+    fig.suptitle("The CHSH test on real hardware", x=0.01, ha="left", color=INK)
+    fig.text(
+        0.01,
+        0.02,
+        f"{result.rounds:,} rounds · S_low at ε = {epsilon:.1e} · prediction committed "
+        f"before the run ({predicted['committed_as'][:7]}) · {run.backend} · qubits "
+        f"{run.qubits[0]}, {run.qubits[1]} · job {run.job_id}",
+        fontsize=8,
+    )
+    fig.subplots_adjust(left=0.14, right=0.97, top=0.84, bottom=0.2, wspace=0.28)
+    return fig
+
+
 # To add a figure: write a function from the runs directory to a Figure, and name its file
 # here. `scripts/figures` renders it; commit the SVG it writes.
 FIGURES: dict[str, Callable[[Path], Figure]] = {
@@ -408,6 +520,7 @@ FIGURES: dict[str, Callable[[Path], Figure]] = {
     "chip-map.svg": chip_map,
     "prediction-scatter.svg": prediction_scatter,
     "extraction.svg": extraction,
+    "chsh.svg": chsh_test,
 }
 
 
