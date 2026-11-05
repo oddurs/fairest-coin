@@ -171,3 +171,14 @@ def test_battery_points_are_rounded_and_floored() -> None:
     points = figures._battery_points(np.zeros(1000, dtype=np.uint8))
     assert all(v == round(v, 2) for v in points.values())
     assert min(points.values()) >= math.log10(figures.P_FLOOR)
+
+
+def test_the_chsh_figure_reports_the_archived_run_against_both_bounds(rendered: Path) -> None:
+    svg = (rendered / "chsh.svg").read_text()
+    # 0042's run: S and its error, S_low at 2⁻³², the committed interval and commit.
+    assert "S = 2.738 ± 0.027" in svg
+    assert "S_low = 2.495" in svg
+    assert "2.713 to 2.815" in svg
+    assert "c86a39c" in svg
+    assert "classical bound 2" in svg
+    assert "Tsirelson 2√2" in svg
