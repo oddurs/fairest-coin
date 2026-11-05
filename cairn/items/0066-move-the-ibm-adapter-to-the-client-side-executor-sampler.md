@@ -45,3 +45,7 @@ Switched: sampler_for builds qiskit_ibm_runtime.executor_sampler.Sampler with th
 ## Result
 
 The IBM adapter uses the executor Sampler, with twirling and dynamical decoupling off and no deprecation warning; results read unchanged. IBM refused the dry run (no mock backend for this account), so the result shape was confirmed in local mode on FakeMarrakesh instead; the first hardware run (0039) confirms it on a real job.
+
+## 2026-11-05
+
+Confirmed on hardware 2026-11-05 by 0039's run (job dbme92m74qds73ds595g): the executor Sampler's result read through result[0].data.c.get_bitstrings() unchanged, 10,000 shots archived, usage charged 5 s, and the archived options show twirling (gates and measure) and dynamical decoupling disabled.

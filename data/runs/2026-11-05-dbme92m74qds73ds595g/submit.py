@@ -1,0 +1,1 @@
+coin run bell --backend ibm_marrakesh --shots 10000 --pair 5 6 --submit --runs-dir data/runs

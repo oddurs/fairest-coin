@@ -132,10 +132,18 @@ class PairScore:
     readout_source: tuple[str, str]
 
 
-def predict_s(
-    alice: QubitNoise, bob: QubitNoise, cz: GateCalibration, readout: tuple[Readout, Readout]
-) -> float:
-    """S for the CHSH test on these two qubits, from their noise and readout."""
+def predict_distribution(
+    alice: QubitNoise,
+    bob: QubitNoise,
+    cz: GateCalibration,
+    readout: tuple[Readout, Readout],
+    circuit: Circuit,
+) -> dict[str, float]:
+    """What a two-qubit circuit, lowered here, reads out on these two qubits.
+
+    Relaxation and depolarizing follow every gate, the `cz`'s sized for four dimensions;
+    then each qubit's bit is misread by its readout. Virtual qubit 0 is Alice's, 1 Bob's.
+    """
     noise = (alice, bob)
 
     def channels(op: Gate | Measure) -> tuple[Channel, ...]:
@@ -152,12 +160,19 @@ def predict_s(
         relaxation = thermal_relaxation(noise[q].t1_ns, noise[q].t2_ns, cal.length_ns, q)
         return (*relaxation, depolarizing(gate_depolarizing(cal.error, relaxation), q))
 
-    correlations = {}
-    for i, a in enumerate(ALICE):
-        for j, b in enumerate(BOB):
-            true = probabilities(lower(circuit(a, b)), channels)
-            read = apply_readout(true, {0: readout[0], 1: readout[1]})
-            correlations[i, j] = correlation(read)
+    true = probabilities(lower(circuit), channels)
+    return apply_readout(true, {0: readout[0], 1: readout[1]})
+
+
+def predict_s(
+    alice: QubitNoise, bob: QubitNoise, cz: GateCalibration, readout: tuple[Readout, Readout]
+) -> float:
+    """S for the CHSH test on these two qubits, from their noise and readout."""
+    correlations = {
+        (i, j): correlation(predict_distribution(alice, bob, cz, readout, circuit(a, b)))
+        for i, a in enumerate(ALICE)
+        for j, b in enumerate(BOB)
+    }
     return s_value(correlations)
 
 
