@@ -6,6 +6,45 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-04
+
+Hardening, second pass: what a review of v0.3 as released found, fixed with the test that
+would have caught it.
+
+### Changed
+
+- A job's record kept outside the runs directory now lives in
+  `$XDG_STATE_HOME/fairest-coin/pending/` (by default `~/.local/state/…`), a directory only
+  you can use. It used to go to the shared temp directory, which a reboot clears.
+- Pending records are readable only by you: a harvest's shots are secret until its batch
+  is spent.
+- `coin flip` and `coin harvest` give ε "if the estimate holds"; it was printed as if it
+  were unconditional.
+- The code, chapter 3 and the 0.3.0 entry below no longer call the min-entropy estimate
+  conservative. They say what it cannot see: each bit the parity of the bits 17 and 20
+  before it, flipped 5% of the time, carries 0.074 bits per bit and is scored about 0.91.
+- Chapter 2 names the chip map the +0.63% lean was measured on, and says what the archive
+  records about when spike 0069's jobs ran. The README claims only what is tested.
+- The chapter tests also run the analysis scripts whose output a chapter shows.
+
+### Fixed
+
+- `coin harvest --from-run` pooled a committed run, whose shots are public, when its path
+  was relative or went through a symlink. A git failure inside a repository now refuses
+  the run too.
+- A power cut after a harvest could keep the pool's batch and lose the archived run and its
+  pending record. Every write the archive, the pending record and the pool rely on now
+  reaches the drive (F_FULLFSYNC on macOS) with its directory synced, before anything
+  relies on it.
+- `coin recover` adopted records it did not write: on a shared machine another user could
+  plant shots and a prediction to be archived. It now ignores records another user owns
+  and records that contradict themselves, and one malformed record no longer stops it.
+- Job `abc` could be taken for an archived job `x-abc`.
+- In a read-only runs directory, failing to remove a lock file hid the message saying where
+  a job's result was kept.
+- 20 checks, from the pool's batch names to the serial test's wraparound, could be deleted
+  without a test failing; each now has one.
+
 ## [0.3.1] - 2026-11-02
 
 Hardening: every defect a review of the first three milestones found, fixed with the test
@@ -135,7 +174,8 @@ The ideal coin: a quantum coin built from scratch, flipped on a simulator.
 - A test suite that runs every example, code excerpt and command quoted in the chapters
   and the README.
 
-[Unreleased]: https://github.com/oddurs/fairest-coin/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/oddurs/fairest-coin/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/oddurs/fairest-coin/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/oddurs/fairest-coin/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/oddurs/fairest-coin/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/oddurs/fairest-coin/compare/v0.1.0...v0.2.0

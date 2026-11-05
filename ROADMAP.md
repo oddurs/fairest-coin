@@ -45,7 +45,7 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 
 v0.3.2: every defect found by the review of v0.3 as released is fixed: a committed run can
 
-### backlog
+### in progress
 
 - [ ] [`0094`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0094-cut-v0-3-2.md) Cut v0.3.2 <sup>chore · p0 · tooling</sup>
 
