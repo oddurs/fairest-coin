@@ -8,8 +8,8 @@ import pytest
 from qiskit.providers.fake_provider import GenericBackendV2
 
 from coin.circuit import Circuit
-from coin.compile import to_qasm
-from coin.ibm import IBMError, IBMTransport, MissingCredentialsError, sampler_for
+from coin.compile import lower, to_qasm
+from coin.ibm import IBMError, IBMTransport, MissingCredentialsError, _by_wire, sampler_for
 
 TOKEN = "sentinel-token-1b2c3"
 INSTANCE = "crn:v1:sentinel-instance"
@@ -399,3 +399,25 @@ def test_an_angle_changed_in_its_third_decimal_is_refused(
     transport = IBMTransport(lambda _t, _i: FakeService(heron_like(2)))
     with pytest.raises(IBMError, match="changed the circuit"):
         transport.run("fake", NATIVE_COIN_QASM, [0], 10)
+
+
+def test_gates_listed_in_another_order_across_qubits_are_the_same_circuit(
+    credentials: None,
+) -> None:
+    # Transpiling the lowered Bell circuit for ibm_marrakesh's qubits 5 and 6 lists the
+    # measurement of 5 after the gates on 6. Nothing changed; a flat comparison refused it
+    # (the first `coin run bell --submit`, 2026-11-05, before any job existed).
+    from qiskit_ibm_runtime.fake_provider import FakeMarrakesh  # noqa: PLC0415
+
+    transport = IBMTransport(lambda _t, _i: FakeService(FakeMarrakesh()))
+    bell = to_qasm(lower(Circuit(2).h(0).cx(0, 1).measure(0, 0).measure(1, 1)))
+    _, _, executed = transport._map("fake", bell, [5, 6])
+    assert executed["cz"] == 1
+
+
+def test_reordering_on_one_qubit_is_still_a_change() -> None:
+    rz = ("rz", (0.5,), (5,), ())
+    sx = ("sx", (), (5,), ())
+    other = ("sx", (), (6,), ())
+    assert _by_wire([rz, other, sx]) == _by_wire([other, rz, sx])
+    assert _by_wire([rz, sx]) != _by_wire([sx, rz])

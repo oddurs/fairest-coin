@@ -14,7 +14,7 @@ from typing import Any
 
 import numpy as np
 
-from coin import __version__, chipmap, chsh, harvest, readout
+from coin import __version__, bell, chipmap, chsh, harvest, readout
 from coin.archive import ArchiveError, load_run
 from coin.chipmap import MAX_SHOTS
 from coin.circuit import Circuit
@@ -180,6 +180,8 @@ def _parser() -> argparse.ArgumentParser:
         "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
     )
     readout_.set_defaults(handler=_readout)
+
+    _add_bell(experiments)
     return parser
 
 
@@ -547,7 +549,9 @@ def _read_calibration(path: Path) -> dict[str, Any]:
 
 def _compare(args: argparse.Namespace) -> int:
     try:
-        print(chipmap.report(load_run(args.run_dir)))
+        run = load_run(args.run_dir)
+        purpose = run.prediction.values.get("purpose") if run.prediction else None
+        print(bell.report(run) if purpose == bell.PURPOSE else chipmap.report(run))
     except (OSError, ValueError, ArchiveError) as error:
         print(f"coin compare: {error}", file=sys.stderr)
         return 1
@@ -647,6 +651,80 @@ def _readout(args: argparse.Namespace) -> int:
         return 1
     print(f"archived     {directory}")
     print(f"published    {hits} of {total} qubits read within 3σ of their published error")  # noqa: RUF001 - σ is the display text
+    return 0
+
+
+def _add_bell(experiments: Any) -> None:
+    bell_ = experiments.add_parser(
+        "bell",
+        help="entangle two qubits and read both: two coins that always agree",
+        description="Prepare the Bell pair on the coupled pair with the best predicted CHSH "
+        "value (or --pair), read both qubits, and archive the run, predicted first. Needs "
+        "QISKIT_IBM_TOKEN and QISKIT_IBM_INSTANCE. Spends QPU time only with --submit.",
+    )
+    bell_.add_argument("--backend", required=True, metavar="NAME")
+    bell_.add_argument(
+        "--shots", type=_at_least(1), required=True, metavar="N", help=f"at most {MAX_SHOTS:,}"
+    )
+    bell_.add_argument(
+        "--pair", nargs=2, type=int, metavar=("A", "B"), help="a coupled pair to use instead"
+    )
+    bell_.add_argument(
+        "--readout",
+        nargs=2,
+        type=Path,
+        metavar=("ZERO_RUN", "ONE_RUN"),
+        help="archived prepare-|0⟩ and prepare-|1⟩ readout runs to predict with",
+    )
+    bell_mode = bell_.add_mutually_exclusive_group(required=True)
+    bell_mode.add_argument(
+        "--dry-run", action="store_true", help="print the plan and its cost; submit nothing"
+    )
+    bell_mode.add_argument(
+        "--submit", action="store_true", help="predict, then submit and archive the job"
+    )
+    bell_.add_argument(
+        "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
+    )
+    bell_.set_defaults(handler=_bell)
+
+
+def _bell(args: argparse.Namespace) -> int:
+    try:
+        measured_readout = (
+            readout.measured(load_run(args.readout[0]), load_run(args.readout[1]))
+            if args.readout
+            else None
+        )
+        transport = _transport()
+        chosen = bell.plan(
+            args.backend,
+            transport.calibration(args.backend),
+            args.shots,
+            pair=tuple(args.pair) if args.pair else None,
+            measured=measured_readout,
+        )
+        print(bell.summary(chosen))
+        if args.dry_run:
+            print("dry run: nothing submitted")
+            return 0
+        a, b = chosen.pair
+        command = (
+            f"coin run bell --backend {args.backend} --shots {args.shots} --pair {a} {b} "
+            f"--submit --runs-dir {args.runs_dir}"
+        )
+        if args.readout:
+            command += f" --readout {args.readout[0]} {args.readout[1]}"
+        directory = submit(transport, chosen.submission, args.runs_dir, submit_script=command)
+        result = bell.report(load_run(directory))
+    except ImportError as error:
+        print(f"coin run: install the ibm extra ({error})", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, RuntimeError, ArchiveError) as error:
+        print(f"coin run bell: {_explain(error)}", file=sys.stderr)
+        return 1
+    print(f"archived     {directory}")
+    print(result)
     return 0
 
 

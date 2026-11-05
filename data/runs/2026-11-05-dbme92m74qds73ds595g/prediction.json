@@ -1,0 +1,20 @@
+{
+  "agreement": 0.9924590603628287,
+  "model": "relaxation and depolarizing per gate, cz included, then readout",
+  "p_one": {
+    "5": 0.5002249832403807,
+    "6": 0.49589916331701933
+  },
+  "pair": [
+    5,
+    6
+  ],
+  "predicted_s": 2.781924401097997,
+  "purpose": "bell",
+  "readout_source": {
+    "5": "published",
+    "6": "published"
+  },
+  "shots": 10000,
+  "written_at": "2026-11-05T20:18:16.764756+00:00"
+}

@@ -1,0 +1,59 @@
+{
+  "backend": "ibm_marrakesh",
+  "executed_ops": {
+    "cz": 1,
+    "measure": 2,
+    "rz": 6,
+    "sx": 3
+  },
+  "finished_at": "2026-11-05T20:18:42.820628+00:00",
+  "job_id": "dbme92m74qds73ds595g",
+  "library_version": "0.3.2",
+  "options": {
+    "default_shots": 4096,
+    "dynamical_decoupling": {
+      "enable": false,
+      "extra_slack_distribution": "middle",
+      "scheduling_method": "alap",
+      "sequence_type": "XX",
+      "skip_reset_qubits": false
+    },
+    "environment": {
+      "image": null,
+      "job_tags": [],
+      "log_level": "WARNING",
+      "max_execution_time": null,
+      "private": false
+    },
+    "execution": {
+      "init_qubits": true,
+      "meas_type": "classified",
+      "rep_delay": null,
+      "scheduler_timing": false,
+      "stretch_values": false
+    },
+    "experimental": {},
+    "max_execution_time": null,
+    "simulator": {
+      "angle_decimals": 5,
+      "layer_noise_model": null,
+      "seed_simulator": null,
+      "warn_absent": true
+    },
+    "twirling": {
+      "enable_gates": false,
+      "enable_measure": false,
+      "group": "pauli",
+      "num_randomizations": "auto",
+      "shots_per_randomization": "auto",
+      "strategy": "active-accum"
+    }
+  },
+  "quantum_seconds": 5.0,
+  "qubits": [
+    5,
+    6
+  ],
+  "shots": 10000,
+  "submitted_at": "2026-11-05T20:18:17.528763+00:00"
+}

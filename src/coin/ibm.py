@@ -126,9 +126,9 @@ class IBMTransport:
         isa = transpile(circuit, backend=backend, initial_layout=list(layout), optimization_level=0)
         # Mapping may only place each virtual qubit on its physical qubit. Routing inserts
         # swaps built from native gates, so comparing gate names would not catch it: compare
-        # every instruction, its angles and its physical qubits, in order.
-        expected = _instructions(circuit, list(layout))
-        if _instructions(isa, list(range(isa.num_qubits))) != expected:
+        # every instruction, its angles and its physical qubits, in order on each wire.
+        expected = _by_wire(_instructions(circuit, list(layout)))
+        if _by_wire(_instructions(isa, list(range(isa.num_qubits)))) != expected:
             raise IBMError("mapping changed the circuit (routing or rewriting); refusing to run it")
         return backend, isa, {name: int(count) for name, count in isa.count_ops().items()}
 
@@ -241,9 +241,26 @@ def _encodings(secret: str) -> set[str]:
     return forms | {form.lower() for form in forms if "%" in form}
 
 
-def _instructions(
-    circuit: Any, physical: list[int]
-) -> list[tuple[str, tuple[float, ...], tuple[int, ...], tuple[int, ...]]]:
+type _Instruction = tuple[str, tuple[float, ...], tuple[int, ...], tuple[int, ...]]
+
+
+def _by_wire(instructions: list[_Instruction]) -> dict[tuple[str, int], list[_Instruction]]:
+    """Each wire's instructions in order: the circuit itself, whatever order lists it.
+
+    Gates on different qubits commute, and transpiling lists them in its own order (a
+    measurement on one qubit may move past gates on the other). Two circuits are the same
+    exactly when every qubit and every classical bit sees the same instructions in the same
+    order, so this is what is compared, never the flat list.
+    """
+    wires: dict[tuple[str, int], list[_Instruction]] = {}
+    for instruction in instructions:
+        _, _, qubits, clbits = instruction
+        for wire in [("q", q) for q in qubits] + [("c", c) for c in clbits]:
+            wires.setdefault(wire, []).append(instruction)
+    return wires
+
+
+def _instructions(circuit: Any, physical: list[int]) -> list[_Instruction]:
     """Each instruction as (name, angles, physical qubits, classical bits).
 
     Barriers carry no physics. The classical bits matter: a measurement that landed in
