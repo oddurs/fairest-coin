@@ -108,7 +108,7 @@ v0.3.2: every defect found by the review of v0.3 as released is fixed: a committ
 
 ## v0.4 — The certified coin
 
-`#####·····` 50% · 7 of 14 done · due 2026-12-27
+`######····` 57% · 8 of 14 done · due 2026-12-27
 
 A Bell test run on real hardware, with the measurement settings chosen by the v0.3 coin,
 
@@ -121,10 +121,6 @@ A Bell test run on real hardware, with the measurement settings chosen by the v0
 - [ ] [`0047`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0047-write-chapter-5-the-proof.md) Write chapter 5: the proof <sup>docs · p0 · essay</sup>
 - [ ] [`0048`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0048-cut-v0-4-0.md) Cut v0.4.0 <sup>chore · p0 · tooling</sup>
 
-### in progress
-
-- [ ] [`0042`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0042-predict-commit-then-measure-s-on-hardware.md) Predict, commit, then measure S on hardware <sup>feature · p0 · chsh</sup>
-
 ### done
 
 - [x] [`0037`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0037-lower-two-qubit-gates-to-the-backend-s-native-entangler.md) Lower two-qubit gates to the backend's native entangler <sup>feature · p0 · compile</sup>
@@ -132,6 +128,7 @@ A Bell test run on real hardware, with the measurement settings chosen by the v0
 - [x] [`0039`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0039-run-two-coins-that-always-agree.md) Run two coins that always agree <sup>feature · p1 · chsh</sup>
 - [x] [`0040`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0040-how-do-we-run-chsh-with-per-shot-random-settings-within-budget.md) How do we run CHSH with per-shot random settings within budget? <sup>spike · p0 · chsh</sup>
 - [x] [`0041`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0041-estimate-s-and-its-uncertainty-from-counts.md) Estimate S and its uncertainty from counts <sup>feature · p0 · chsh</sup>
+- [x] [`0042`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0042-predict-commit-then-measure-s-on-hardware.md) Predict, commit, then measure S on hardware <sup>feature · p0 · chsh</sup>
 - [x] [`0066`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0066-move-the-ibm-adapter-to-the-client-side-executor-sampler.md) Move the IBM adapter to the client-side executor Sampler <sup>chore · p1 · hardware</sup>
 - [x] [`0086`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0086-keep-agent-instructions-out-of-the-repository.md) Keep agent instructions out of the repository <sup>chore · p2 · tooling</sup>
 
