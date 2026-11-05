@@ -15,6 +15,7 @@ from coin import bell, chsh, cli, readout
 from coin.archive import load_run
 from coin.commitment import committed
 from coin.hardware import JobResult, submit
+from coin.pool import Pool
 from coin.readout import ReadoutCounts
 from tests.test_chsh import CALIBRATION
 from tests.test_hardware import FakeTransport
@@ -141,6 +142,9 @@ def test_predict_commit_then_submit(
     transport = SweepTransport(np.random.default_rng(6))
     monkeypatch.setattr(cli, "_transport", lambda: transport)
     predictions = repo / "predictions"
+    # The settings come from the pool: two bits a round.
+    pool = repo / "pool"
+    Pool(pool).add(np.random.default_rng(7).integers(0, 2, 4000), {}, label="settings")
     code, out, err = cli_run(
         [
             "run",
@@ -155,6 +159,8 @@ def test_predict_commit_then_submit(
             str(one),
             "--predictions-dir",
             str(predictions),
+            "--pool",
+            str(pool),
         ],
         capsys,
     )

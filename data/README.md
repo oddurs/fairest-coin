@@ -130,6 +130,13 @@ runs exactly that plan, and records the commit in the run's `prediction.json` as
 pull request first; the run is submitted from `main` after it, and its result merges later,
 leaving the prediction's commit an ancestor of the result's.
 
+A CHSH run whose settings came from the entropy pool (`coin run chsh --predict` draws
+them there, two bits a round, and the prediction names the batch) can be certified:
+`coin certify RUN` hashes its outcome bits at the min-entropy its S_low vouches for and adds
+them to the pool as a certified batch. Like a harvest, such a run is committed only once
+its certified batch is spent, through `coin publish`; before then its shots would make the
+certified bits predictable.
+
 ## Jobs that never finished archiving
 
 Before anything is submitted, `coin.hardware.submit` writes a pending record,

@@ -180,7 +180,7 @@ def test_coin_run_chsh_dry_run_writes_and_submits_nothing(
     code, out, _ = cli_run([*argv, "--dry-run", "--predictions-dir", str(tmp_path)], capsys)
     assert code == 0
     assert "pair         2-3" in out
-    assert out.rstrip().endswith("dry run: nothing written, nothing submitted")
+    assert out.rstrip().endswith("dry run: nothing written, nothing submitted, no pool bit spent")
     assert transport.rows is None
     assert not list(tmp_path.iterdir())
 
