@@ -22,7 +22,8 @@ from typing import Any
 from urllib.parse import quote, quote_plus
 
 from qiskit import qasm3, transpile
-from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+from qiskit_ibm_runtime import QiskitRuntimeService
+from qiskit_ibm_runtime.executor_sampler import Sampler
 
 from coin.hardware import JobResult
 
@@ -200,9 +201,13 @@ SAMPLER_OPTIONS: dict[str, Any] = {
 }
 
 
-def sampler_for(backend: Any) -> SamplerV2:
-    """A sampler on `backend` that runs our circuit exactly as written."""
-    return SamplerV2(mode=backend, options=SAMPLER_OPTIONS)
+def sampler_for(backend: Any) -> Sampler:
+    """A sampler on `backend` that runs our circuit exactly as written.
+
+    The executor Sampler, which replaced the deprecated SamplerV2: it post-processes results
+    on the client into the same PrimitiveResult shape, so the shots are read as before.
+    """
+    return Sampler(mode=backend, options=SAMPLER_OPTIONS)
 
 
 def _require(name: str) -> str:

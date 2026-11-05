@@ -93,8 +93,6 @@ def test_a_circuit_that_mapping_would_change_is_refused(credentials: None) -> No
         transport.run("fake", qasm, [0, 1], 10)
 
 
-# SamplerV2 is deprecated in favour of the executor Sampler; the warning is expected here.
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_the_sampler_runs_the_circuit_as_written() -> None:
     # Any: Qiskit types each option group as `Options | dict`; at runtime they are Options.
     options: Any = sampler_for(GenericBackendV2(1, basis_gates=["rz", "sx", "x"], seed=1)).options
@@ -107,13 +105,6 @@ NATIVE_COIN_QASM = to_qasm(
     Circuit(1).rz(1.5707963267948966, 0).sx(0).rz(1.5707963267948966, 0).measure(0, 0)
 )
 LINE = [[0, 1], [1, 0], [1, 2], [2, 1]]
-# A local run warns that SamplerV2 is deprecated, that the sampler options do nothing without
-# real hardware, and that it falls back to Qiskit's basic simulator; all expected offline.
-LOCAL_RUN = (
-    pytest.mark.filterwarnings("ignore::DeprecationWarning"),
-    pytest.mark.filterwarnings("ignore:Options .* have no effect in local testing mode"),
-    pytest.mark.filterwarnings("ignore:Aer not found"),
-)
 
 
 def heron_like(n: int) -> GenericBackendV2:
@@ -122,9 +113,6 @@ def heron_like(n: int) -> GenericBackendV2:
     )
 
 
-@LOCAL_RUN[0]
-@LOCAL_RUN[1]
-@LOCAL_RUN[2]
 def test_routing_is_refused_even_when_it_only_adds_native_gates(credentials: None) -> None:
     # cz between qubits 0 and 2 of a line needs swaps, which are built from native gates.
     transport = IBMTransport(lambda _t, _i: FakeService(heron_like(3)))
@@ -135,9 +123,6 @@ def test_routing_is_refused_even_when_it_only_adds_native_gates(credentials: Non
     assert transport.run("fake", qasm, [0, 1], 10).executed_ops["cz"] == 1
 
 
-@LOCAL_RUN[0]
-@LOCAL_RUN[1]
-@LOCAL_RUN[2]
 def test_a_run_comes_back_whole_from_a_local_backend(credentials: None) -> None:
     transport = IBMTransport(lambda _t, _i: FakeService(heron_like(2)))
     result = transport.run("fake", NATIVE_COIN_QASM, [1], 50)
