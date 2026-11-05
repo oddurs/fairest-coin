@@ -1,0 +1,45 @@
+{
+  "committed_as": "c86a39cfcfb6a715e661121228b50fdf9df87b75",
+  "correlations": {
+    "00": 0.6901623600365379,
+    "01": 0.6901597352218158,
+    "10": 0.6924485753896588,
+    "11": -0.6924378356781798
+  },
+  "epsilon": 2.3283064365386963e-10,
+  "interval": [
+    2.712584402263145,
+    2.8152951558137365
+  ],
+  "interval_assumptions": "readout errors drawn from their Beta posteriors given the readout runs' counts; cz error scaled by a log-uniform factor in [1/2, 2]; sampling scatter of 12,000 rounds; middle 95%",
+  "model": "relaxation and depolarizing per gate, cz included, then readout",
+  "pair": [
+    153,
+    154
+  ],
+  "prediction_file": "data/predictions/2026-11-05T215257-chsh-ibm_marrakesh.json.gz",
+  "program_sha256": "2203196cf69aa5cf73be9bb726b4a87376f0672d40929e31ba5c60e253641095",
+  "purpose": "chsh",
+  "readout_counts": {
+    "153": {
+      "ones_given_0": 1,
+      "shots_0": 10000,
+      "shots_1": 10000,
+      "zeros_given_1": 46
+    },
+    "154": {
+      "ones_given_0": 45,
+      "shots_0": 10000,
+      "shots_1": 10000,
+      "zeros_given_1": 54
+    }
+  },
+  "readout_source": {
+    "153": "measured",
+    "154": "measured"
+  },
+  "rounds": 12000,
+  "s": 2.7652085063261924,
+  "standard_error": 0.026384340499808465,
+  "written_at": "2026-11-05T21:52:57.755799+00:00"
+}

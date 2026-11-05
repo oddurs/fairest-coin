@@ -33,10 +33,10 @@ Then it runs the design from the CHSH spike and archives the result.
 
 ## Acceptance criteria
 
-- [ ] Submission refuses while the prediction is uncommitted, with a message saying so
-- [ ] The prediction states S and an interval, and the result says whether the measured S fell inside it
-- [ ] Archived run reports S, its standard error, and S_low at the stated ε
-- [ ] S is also reported for each half of the run, so drift during the job is visible
+- [x] Submission refuses while the prediction is uncommitted, with a message saying so
+- [x] The prediction states S and an interval, and the result says whether the measured S fell inside it
+- [x] Archived run reports S, its standard error, and S_low at the stated ε
+- [x] S is also reported for each half of the run, so drift during the job is visible
 - [ ] The prediction commit is an ancestor of the result commit in the git history
 
 ## 2026-11-05
@@ -46,3 +46,7 @@ Code first, in its own PR, because squash merges would erase a branch-only predi
 ## 2026-11-05
 
 Prediction, 2026-11-05 21:52 UTC: data/predictions/2026-11-05T215257-chsh-ibm_marrakesh.json.gz. Readout measured the same session (10,000 shots each way, data/runs/2026-11-05-dbmfl0t8mdtc73d7sq4g and -dbmfl6674qds73ds7bkg; only 34 and 44 of 156 qubits read within 3σ of their published error). With it the best pair is 153-154 (qubit 5 now misreads |0⟩ 6% of the time, so 5-6 fell back). Predicted S = 2.765 ± 0.026 at 12,000 rounds, 95% interval [2.713, 2.815], about 14 QPU s. Merged to main before the run, in its own PR.
+
+## 2026-11-05
+
+Result, run by the owner 2026-11-05 22:03 UTC: data/runs/2026-11-05-dbmfqed8ft8s738upl80, ibm_marrakesh 153-154, 12,000 rounds, 7 QPU s (≈ 2 s + 0.42 ms per swept round, better than spike 0040's rough 1 ms). S = 2.738 ± 0.027 against 2.765 predicted (z = −1.0), inside the committed 95% interval [2.713, 2.815]. S_low = 2.495 at ε = 2.3 × 10⁻¹⁰. Halves 2.775 ± 0.037 and 2.701 ± 0.038 (difference 1.4σ: no clear drift). Correlations +0.674, +0.687, +0.699, −0.678 against ±0.690–0.692 predicted. Twirling and dynamical decoupling off. Predicted 21:52:57, committed on main as c86a39c (#80), submitted 22:03:37; the run records committed_as = c86a39c.

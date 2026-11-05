@@ -1,0 +1,1 @@
+coin run chsh --submit --prediction data/predictions/2026-11-05T215257-chsh-ibm_marrakesh.json.gz --runs-dir data/runs
