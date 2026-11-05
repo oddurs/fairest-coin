@@ -98,9 +98,8 @@ def test_replace_syncs_the_file_then_its_name(
     durable.replace(target, b"{}")
     assert target.read_bytes() == b"{}"
     assert [p.name for p in tmp_path.iterdir()] == ["spent.json"]
-    renamed = syncs.index(("rename", target))
-    assert syncs.events[:renamed] == [("sync", inode(target))]
-    assert syncs.events[renamed + 1 :] == [("sync", inode(tmp_path))]
+    events = [e for e in syncs.events if e[0] != "unlink"]
+    assert events == [("sync", inode(target)), ("rename", target), ("sync", inode(tmp_path))]
 
 
 def test_the_pool_syncs_every_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

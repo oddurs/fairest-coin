@@ -41,19 +41,19 @@ v0.3.1: every defect found by the review of the first three milestones is fixed,
 
 ## v0.3.2 — Hardening, second pass
 
-`########··` 71% · 5 of 7 done · due 2026-11-11
+`#########·` 86% · 6 of 7 done · due 2026-11-11
 
 v0.3.2: every defect found by the review of v0.3 as released is fixed: a committed run can
 
 ### backlog
 
-- [ ] [`0090`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0090-trust-only-this-user-s-pending-records-in-recovery.md) Trust only this user's pending records in recovery <sup>bug · p1 · hardware</sup>
 - [ ] [`0094`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0094-cut-v0-3-2.md) Cut v0.3.2 <sup>chore · p0 · tooling</sup>
 
 ### done
 
 - [x] [`0088`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0088-refuse-a-committed-run-however-its-path-is-written.md) Refuse a committed run however its path is written <sup>bug · p0 · extract</sup>
 - [x] [`0089`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0089-write-the-archive-as-durably-as-the-pool.md) Write the archive as durably as the pool <sup>bug · p1 · hardware</sup>
+- [x] [`0090`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0090-trust-only-this-user-s-pending-records-in-recovery.md) Trust only this user's pending records in recovery <sup>bug · p1 · hardware</sup>
 - [x] [`0091`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0091-say-what-the-min-entropy-estimate-cannot-see.md) Say what the min-entropy estimate cannot see <sup>bug · p1 · extract</sup>
 - [x] [`0092`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0092-validate-archive-and-mitigation-inputs-and-kill-the-other-mutants.md) Validate archive and mitigation inputs and kill the other mutants <sup>chore · p2 · tooling</sup>
 - [x] [`0093`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0093-correct-the-essay-where-the-v0-3-review-found-it-wrong.md) Correct the essay where the v0.3 review found it wrong <sup>docs · p2 · essay</sup>
