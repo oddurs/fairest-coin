@@ -1,0 +1,24 @@
+{
+  "correlations": {
+    "00": 0.6946122692845645,
+    "01": 0.6946124964918151,
+    "10": 0.6939502395135537,
+    "11": -0.693959857034502
+  },
+  "epsilon": 2.3283064365386963e-10,
+  "model": "relaxation and depolarizing per gate, cz included, then readout",
+  "pair": [
+    5,
+    6
+  ],
+  "purpose": "chsh",
+  "readout_source": {
+    "5": "published",
+    "6": "published"
+  },
+  "rounds": 2000,
+  "s": 2.7771348623244356,
+  "settings": "given",
+  "standard_error": 0.06437204450661002,
+  "written_at": "2026-11-05T20:55:34.712032+00:00"
+}

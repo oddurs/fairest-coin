@@ -1,0 +1,1 @@
+coin run chsh --backend ibm_marrakesh --rounds 2000 --pair 5 6 --submit --runs-dir data/runs

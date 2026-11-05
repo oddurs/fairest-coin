@@ -9,7 +9,8 @@ the same noise model, so the agreement rate this run measures also tests that mo
 """
 
 import math
-from collections.abc import Mapping
+import secrets
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -19,8 +20,8 @@ from coin.archive import Prediction, Run
 from coin.chipmap import MAX_SHOTS, estimate_qpu_seconds, tails_by_qubit
 from coin.circuit import Circuit, Gate
 from coin.compile import lower
-from coin.hardware import Submission
-from coin.noise import Readout, model_from_calibration, pair_gates
+from coin.hardware import Submission, Sweep
+from coin.noise import GateCalibration, QubitNoise, Readout, model_from_calibration, pair_gates
 
 PURPOSE = "bell"
 # A measured rate within this many standard deviations of its prediction counts as a hit.
@@ -39,17 +40,23 @@ class BellPlan:
     readout_source: tuple[str, str]
 
 
-def plan(
-    backend: str,
+@dataclass(frozen=True)
+class _Pair:
+    score: chsh.PairScore
+    # What the noise model needs: each qubit's noise, the cz, each qubit's readout.
+    noise: tuple[QubitNoise, QubitNoise, GateCalibration, tuple[Readout, Readout]]
+
+    @property
+    def pair(self) -> tuple[int, int]:
+        return self.score.pair
+
+
+def _choose(
     calibration: dict[str, Any],
-    shots: int,
-    *,
-    pair: tuple[int, int] | None = None,
-    measured: Mapping[int, Readout] | None = None,
-) -> BellPlan:
-    """The best pair (or `pair`), its predicted agreement and marginals, and the job."""
-    if not 1 <= shots <= MAX_SHOTS:
-        raise ValueError(f"shots must be between 1 and {MAX_SHOTS:,}, got {shots}")
+    pair: tuple[int, int] | None,
+    measured: Mapping[int, Readout] | None,
+) -> _Pair:
+    """The best-ranked coupled pair, or `pair` if it is one, with its noise and readout."""
     ranked = {score.pair: score for score in chsh.rank_pairs(calibration, measured)}
     if not ranked:
         raise ValueError("no coupled pair in this calibration has usable noise data")
@@ -61,17 +68,33 @@ def plan(
             raise ValueError(
                 f"qubits {key[0]} and {key[1]} are not a coupled pair with usable calibration"
             )
-    chosen = ranked[key]
-    a, b = chosen.pair
+    a, b = key
     model = model_from_calibration(calibration)
-    readout = tuple((measured or {}).get(q, model.qubits[q].readout) for q in (a, b))
-    distribution = chsh.predict_distribution(
+    readout = tuple((measured or {}).get(q, model.qubits[q].readout) for q in key)
+    noise = (
         model.qubits[a],
         model.qubits[b],
-        pair_gates(calibration)[a, b],
+        pair_gates(calibration)[key],
         (readout[0], readout[1]),
-        CIRCUIT,
     )
+    return _Pair(ranked[key], noise)
+
+
+def plan(
+    backend: str,
+    calibration: dict[str, Any],
+    shots: int,
+    *,
+    pair: tuple[int, int] | None = None,
+    measured: Mapping[int, Readout] | None = None,
+) -> BellPlan:
+    """The best pair (or `pair`), its predicted agreement and marginals, and the job."""
+    if not 1 <= shots <= MAX_SHOTS:
+        raise ValueError(f"shots must be between 1 and {MAX_SHOTS:,}, got {shots}")
+    chosen = _choose(calibration, pair, measured)
+    a, b = chosen.pair
+    score = chosen.score
+    distribution = chsh.predict_distribution(*chosen.noise, lower(CIRCUIT))
     # Outcome strings are "<b's bit><a's bit>".
     agreement = distribution.get("00", 0.0) + distribution.get("11", 0.0)
     p_one = (
@@ -84,8 +107,8 @@ def plan(
         "pair": [a, b],
         "agreement": agreement,
         "p_one": {str(a): p_one[0], str(b): p_one[1]},
-        "readout_source": {str(a): chosen.readout_source[0], str(b): chosen.readout_source[1]},
-        "predicted_s": chosen.s,
+        "readout_source": {str(a): score.readout_source[0], str(b): score.readout_source[1]},
+        "predicted_s": score.s,
         "shots": shots,
     }
     submission = Submission(
@@ -96,7 +119,7 @@ def plan(
         calibration=calibration,
         prediction=Prediction(written_at=datetime.now(UTC), values=values),
     )
-    return BellPlan(submission, (a, b), agreement, p_one, chosen.s, chosen.readout_source)
+    return BellPlan(submission, (a, b), agreement, p_one, score.s, score.readout_source)
 
 
 def summary(chosen: BellPlan) -> str:
@@ -147,3 +170,123 @@ def _line(name: str, measured: float, predicted: float, n: int) -> str:
         f"{name:<12} {measured:.2%} measured, {predicted:.2%} predicted, z = {z:+.1f} "
         f"({verdict} {SIGMAS}σ)"  # noqa: RUF001 - σ is the display text
     )
+
+
+CHSH_PURPOSE = "chsh"
+# The distance from uniform S_low is stated at; the same ε the extraction uses.
+EPSILON = 2.0**-32
+
+
+@dataclass(frozen=True)
+class ChshPlan:
+    submission: Submission
+    pair: tuple[int, int]
+    s: float  # predicted, for the swept circuits that actually run
+    standard_error: float  # expected at this many rounds, from the predicted correlations
+    readout_source: tuple[str, str]
+
+
+def random_choices(rounds: int) -> tuple[int, ...]:
+    """Each round's setting, uniform over the four, from the operating system's generator."""
+    return tuple(secrets.randbelow(len(chsh.SETTINGS)) for _ in range(rounds))
+
+
+def plan_chsh(
+    backend: str,
+    calibration: dict[str, Any],
+    choices: Sequence[int],
+    *,
+    pair: tuple[int, int] | None = None,
+    measured: Mapping[int, Readout] | None = None,
+) -> ChshPlan:
+    """The CHSH test on the best pair (or `pair`), round i run at `chsh.SETTINGS[choices[i]]`.
+
+    All four settings run in one job, interleaved round by round as `choices` orders them,
+    so drift during the job touches every correlation alike. The bound S_low assumes the
+    choices were uniform and independent of the devices.
+    """
+    rounds = len(choices)
+    if not 1 <= rounds <= MAX_SHOTS:
+        raise ValueError(f"rounds must be between 1 and {MAX_SHOTS:,}, got {rounds}")
+    picked = tuple(choices)
+    chosen = _choose(calibration, pair, measured)
+    a, b = chosen.pair
+    circuits = chsh.setting_circuits()
+    swept = tuple(circuits[setting] for setting in chsh.SETTINGS)
+    correlations = {
+        setting: chsh.correlation(chsh.predict_distribution(*chosen.noise, circuits[setting]))
+        for setting in chsh.SETTINGS
+    }
+    s = chsh.s_value(correlations)
+    per_setting = rounds / len(chsh.SETTINGS)
+    error = math.sqrt(sum((1 - e * e) / per_setting for e in correlations.values()))
+    values = {
+        "purpose": CHSH_PURPOSE,
+        "model": "relaxation and depolarizing per gate, cz included, then readout",
+        "pair": [a, b],
+        "s": s,
+        "standard_error": error,
+        "correlations": {f"{i}{j}": e for (i, j), e in correlations.items()},
+        "readout_source": {
+            str(a): chosen.score.readout_source[0],
+            str(b): chosen.score.readout_source[1],
+        },
+        "settings": "uniform from the operating system's generator" if choices is None else "given",
+        "epsilon": EPSILON,
+        "rounds": rounds,
+    }
+    submission = Submission(
+        circuit=swept[0],
+        backend=backend,
+        layout=(a, b),
+        shots=rounds,
+        calibration=calibration,
+        prediction=Prediction(written_at=datetime.now(UTC), values=values),
+        sweep=Sweep(swept, picked),
+    )
+    return ChshPlan(submission, (a, b), s, error, chosen.score.readout_source)
+
+
+def chsh_summary(chosen: ChshPlan) -> str:
+    a, b = chosen.pair
+    rounds = chosen.submission.shots
+    return "\n".join(
+        [
+            f"backend      {chosen.submission.backend}",
+            f"pair         {a}-{b}; readout {chosen.readout_source[0]} for {a}, "
+            f"{chosen.readout_source[1]} for {b}",
+            f"settings     one of four per round, all in one job: {rounds:,} rounds",
+            f"predicted    S = {chosen.s:.3f} ± {chosen.standard_error:.3f}",
+            f"estimated    ~{estimate_qpu_seconds(rounds):.0f} QPU seconds, if a swept round "
+            "costs what a shot does",
+        ]
+    )
+
+
+def chsh_report(run: Run) -> str:
+    """S, its standard error and S_low from a swept run, against its prediction."""
+    values = run.prediction.values if run.prediction else {}
+    if values.get("purpose") != CHSH_PURPOSE:
+        raise ValueError(f"job {run.job_id}: not a CHSH run")
+    if run.memory is None or "choices" not in run.extra:
+        raise ValueError(f"job {run.job_id} kept no per-shot memory and choices")
+    counts = chsh.counts_by_setting(run.memory, run.extra["choices"])
+    result = chsh.estimate(counts)
+    predicted = values["s"]
+    z = (result.s - predicted) / result.standard_error if result.standard_error else math.inf
+    epsilon = values.get("epsilon", EPSILON)
+    lines = [
+        f"pair         {run.qubits[0]}-{run.qubits[1]}, {result.rounds:,} rounds",
+        f"S            {result.s:.3f} ± {result.standard_error:.3f} measured, "
+        f"{predicted:.3f} predicted, z = {z:+.1f}",
+        f"S_low        {result.lower_bound(epsilon):.3f} at ε = {epsilon:.1e} "
+        f"(classical bound 2, Tsirelson {chsh.TSIRELSON:.3f})",
+    ]
+    measured = chsh.correlations_by_setting(counts)
+    for (i, j), e in measured.items():
+        n = sum(counts[i, j].values())
+        lines.append(
+            f"E({i},{j})       {e:+.3f} measured, {values['correlations'][f'{i}{j}']:+.3f} "
+            f"predicted, {n:,} rounds"
+        )
+    return "\n".join(lines)

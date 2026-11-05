@@ -32,7 +32,7 @@ from typing import Any, Protocol
 from coin import __version__, durable
 from coin.archive import ArchiveError, Prediction, Run, write_run
 from coin.circuit import Circuit
-from coin.compile import coupled_pairs, require_coupled, to_qasm
+from coin.compile import coupled_pairs, require_coupled, sweep_qasm, to_qasm
 
 
 @dataclass(frozen=True)
@@ -56,20 +56,36 @@ class Transport(Protocol):
 
     def calibration(self, backend: str) -> dict[str, Any]: ...
 
-    def run(
+    def run(  # noqa: PLR0913 - each argument is a separate fact about the job
         self,
         backend: str,
         qasm: str,
         layout: Sequence[int],
         shots: int,
         on_submitted: Callable[[str, dict[str, Any]], None] | None = None,
+        *,
+        parameter_values: Sequence[Sequence[float]] | None = None,
     ) -> JobResult:
         """Run and return the result.
 
         Call `on_submitted(job_id, details)` as soon as the job exists, where details holds
         `submitted_at` (ISO 8601), `executed_ops` and `options`: what a recovered run will need.
+        With `parameter_values`, `qasm` declares inputs and each row binds them for one shot,
+        so `shots` equals the number of rows and the memory comes back in row order.
         """
         ...
+
+
+@dataclass(frozen=True)
+class Sweep:
+    """Several circuits one job chooses among, shot by shot.
+
+    Shot i runs `circuits[choices[i]]`. The circuits must differ only in `rz` angles, so the
+    job is one program with those angles as parameters, bound per shot.
+    """
+
+    circuits: tuple[Circuit, ...]
+    choices: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -87,6 +103,8 @@ class Submission:
     shots: int
     calibration: dict[str, Any]
     prediction: Prediction
+    # With a sweep, `circuit` is its first circuit and each shot runs the one it chooses.
+    sweep: Sweep | None = None
 
     def __post_init__(self) -> None:
         if len(self.layout) != self.circuit.n_qubits or len(set(self.layout)) != len(self.layout):
@@ -97,6 +115,22 @@ class Submission:
             raise ValueError(f"shots must be at least 1, got {self.shots}")
         to_qasm(self.circuit)  # raises now if anything is not native
         require_coupled(self.circuit, self.layout, coupled_pairs(self.calibration))
+        if self.sweep is not None:
+            circuits, choices = self.sweep.circuits, self.sweep.choices
+            if not circuits or circuits[0] != self.circuit:
+                raise ValueError("a sweep's first circuit must be the submission's circuit")
+            if len(circuits) > _MAX_SWEPT:
+                raise ValueError(f"a sweep chooses among at most {_MAX_SWEPT} circuits")
+            if len(choices) != self.shots or not set(choices) <= set(range(len(circuits))):
+                raise ValueError(f"a sweep needs one choice in 0..{len(circuits) - 1} per shot")
+            for swept in circuits:
+                to_qasm(swept)
+                require_coupled(swept, self.layout, coupled_pairs(self.calibration))
+            sweep_qasm(circuits)  # raises now if they differ in more than rz angles
+
+
+# Each shot's choice is archived as one digit.
+_MAX_SWEPT = 10
 
 
 def submit(
@@ -110,7 +144,12 @@ def submit(
     # Checked at the last moment, not at planning time: the prediction must predate the job.
     if written.tzinfo is None or written >= datetime.now(UTC):
         raise ValueError("the prediction must be written, with a timezone, before submission")
-    qasm = to_qasm(submission.circuit)
+    rows: list[tuple[float, ...]] | None = None
+    if submission.sweep is None:
+        qasm = to_qasm(submission.circuit)
+    else:
+        program = sweep_qasm(submission.sweep.circuits)
+        qasm, rows = program.qasm, [program.values[k] for k in submission.sweep.choices]
     # Everything that could stop the run being archived is checked while it is still free.
     _require_writable(runs_dir)
     for label, data in (
@@ -138,9 +177,19 @@ def submit(
     # The lock tells `recover` this process is still waiting on the job.
     with _waiting(pending):
         try:
-            result = transport.run(
-                submission.backend, qasm, submission.layout, submission.shots, on_submitted
-            )
+            if rows is None:
+                result = transport.run(
+                    submission.backend, qasm, submission.layout, submission.shots, on_submitted
+                )
+            else:
+                result = transport.run(
+                    submission.backend,
+                    qasm,
+                    submission.layout,
+                    submission.shots,
+                    on_submitted,
+                    parameter_values=rows,
+                )
         except BaseException as error:
             _note_lost(error, record, pending)
             raise
@@ -356,6 +405,13 @@ def _new_record(
         "submit_script": submit_script,
         # Replaced by the transport's own submission time once the job exists.
         "submitted_at": datetime.now(UTC).isoformat(),
+        # Kept before submission: without it a recovered sweep's shots could not be sorted
+        # by the circuit each one ran.
+        **(
+            {"choices": "".join(str(k) for k in submission.sweep.choices)}
+            if submission.sweep is not None
+            else {}
+        ),
     }
 
 
@@ -528,7 +584,12 @@ def _archive(record: dict[str, Any], result: JobResult, runs_dir: Path) -> Path:
         usage=result.usage,
         library_version=__version__,
         submit_script=record["submit_script"],
-        extra={"executed_ops": result.executed_ops, "options": result.options},
+        extra={
+            "executed_ops": result.executed_ops,
+            "options": result.options,
+            # Which swept circuit each shot ran, one digit per shot, in shot order.
+            **({"choices": record["choices"]} if "choices" in record else {}),
+        },
     )
     return write_run(runs_dir, run)
 

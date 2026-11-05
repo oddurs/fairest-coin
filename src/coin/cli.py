@@ -182,6 +182,7 @@ def _parser() -> argparse.ArgumentParser:
     readout_.set_defaults(handler=_readout)
 
     _add_bell(experiments)
+    _add_chsh(experiments)
     return parser
 
 
@@ -551,7 +552,8 @@ def _compare(args: argparse.Namespace) -> int:
     try:
         run = load_run(args.run_dir)
         purpose = run.prediction.values.get("purpose") if run.prediction else None
-        print(bell.report(run) if purpose == bell.PURPOSE else chipmap.report(run))
+        reports = {bell.PURPOSE: bell.report, bell.CHSH_PURPOSE: bell.chsh_report}
+        print(reports.get(purpose, chipmap.report)(run))
     except (OSError, ValueError, ArchiveError) as error:
         print(f"coin compare: {error}", file=sys.stderr)
         return 1
@@ -687,6 +689,79 @@ def _add_bell(experiments: Any) -> None:
         "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
     )
     bell_.set_defaults(handler=_bell)
+
+
+def _add_chsh(experiments: Any) -> None:
+    chsh_ = experiments.add_parser(
+        "chsh",
+        help="the CHSH test: S from four settings chosen round by round in one job",
+        description="Run the CHSH test on the coupled pair with the best predicted S (or "
+        "--pair): each round's setting drawn uniformly by the operating system, all four "
+        "interleaved in one job, S predicted first. Needs QISKIT_IBM_TOKEN and "
+        "QISKIT_IBM_INSTANCE. Spends QPU time only with --submit.",
+    )
+    chsh_.add_argument("--backend", required=True, metavar="NAME")
+    chsh_.add_argument(
+        "--rounds", type=_at_least(1), required=True, metavar="N", help=f"at most {MAX_SHOTS:,}"
+    )
+    chsh_.add_argument(
+        "--pair", nargs=2, type=int, metavar=("A", "B"), help="a coupled pair to use instead"
+    )
+    chsh_.add_argument(
+        "--readout",
+        nargs=2,
+        type=Path,
+        metavar=("ZERO_RUN", "ONE_RUN"),
+        help="archived prepare-|0⟩ and prepare-|1⟩ readout runs to predict with",
+    )
+    mode = chsh_.add_mutually_exclusive_group(required=True)
+    mode.add_argument(
+        "--dry-run", action="store_true", help="print the plan and its cost; submit nothing"
+    )
+    mode.add_argument("--submit", action="store_true", help="predict, then submit and archive")
+    chsh_.add_argument(
+        "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
+    )
+    chsh_.set_defaults(handler=_chsh)
+
+
+def _chsh(args: argparse.Namespace) -> int:
+    try:
+        measured_readout = (
+            readout.measured(load_run(args.readout[0]), load_run(args.readout[1]))
+            if args.readout
+            else None
+        )
+        transport = _transport()
+        chosen = bell.plan_chsh(
+            args.backend,
+            transport.calibration(args.backend),
+            bell.random_choices(args.rounds),
+            pair=tuple(args.pair) if args.pair else None,
+            measured=measured_readout,
+        )
+        print(bell.chsh_summary(chosen))
+        if args.dry_run:
+            print("dry run: nothing submitted")
+            return 0
+        a, b = chosen.pair
+        command = (
+            f"coin run chsh --backend {args.backend} --rounds {args.rounds} --pair {a} {b} "
+            f"--submit --runs-dir {args.runs_dir}"
+        )
+        if args.readout:
+            command += f" --readout {args.readout[0]} {args.readout[1]}"
+        directory = submit(transport, chosen.submission, args.runs_dir, submit_script=command)
+        result = bell.chsh_report(load_run(directory))
+    except ImportError as error:
+        print(f"coin run: install the ibm extra ({error})", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, RuntimeError, ArchiveError) as error:
+        print(f"coin run chsh: {_explain(error)}", file=sys.stderr)
+        return 1
+    print(f"archived     {directory}")
+    print(result)
+    return 0
 
 
 def _bell(args: argparse.Namespace) -> int:

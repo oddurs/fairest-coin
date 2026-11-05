@@ -23,6 +23,7 @@ not part of the program: the hardware adapter passes the layout to Qiskit's tran
 import cmath
 import math
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -109,19 +110,100 @@ def to_qasm(circuit: Circuit) -> str:
     Raises ValueError naming the first gate outside the native set, so an unlowered circuit
     can never reach hardware by accident.
     """
+    return _program(circuit, {}, [])
+
+
+def zxzxz(u: Matrix, q: int) -> list[Gate]:
+    """`u` on qubit `q` as exactly rz·sx·rz·sx·rz, never shortened.
+
+    Five gates where `lower` might emit fewer: circuits that must share one skeleton (the
+    CHSH settings, swept by parameter) need the same gates whatever the unitary, differing
+    only in their `rz` angles, which are free on hardware.
+    """
+    phi, theta, lam = _euler(u)
+    return [
+        Gate("rz", (q,), (_wrap(lam),)),
+        Gate("sx", (q,)),
+        Gate("rz", (q,), (_wrap(theta + math.pi),)),
+        Gate("sx", (q,)),
+        Gate("rz", (q,), (_wrap(phi + math.pi),)),
+    ]
+
+
+@dataclass(frozen=True)
+class SweptProgram:
+    """Several circuits as one parametrised program: the template, and each one's angles."""
+
+    qasm: str
+    values: tuple[tuple[float, ...], ...]  # one row per circuit, in the order given
+
+
+def sweep_qasm(circuits: Sequence[Circuit]) -> SweptProgram:
+    """One OpenQASM 3 program standing for all of `circuits`, which must differ only in their
+    `rz` angles. Each angle that varies becomes an `input float[64] p<k>`, and `values[i]`
+    sets them to make circuit i. Raises ValueError if anything else differs.
+    """
+    if not circuits:
+        raise ValueError("a sweep needs at least one circuit")
+    first = circuits[0]
+    skeleton = [_skeleton(op) for op in first.ops]
+    for c in circuits[1:]:
+        if c.n_qubits != first.n_qubits or [_skeleton(op) for op in c.ops] != skeleton:
+            raise ValueError("swept circuits must have the same gates, differing only in rz angles")
+    angles = [[_angle(op) for op in c.ops] for c in circuits]
+    varying = [k for k in range(len(first.ops)) if len({row[k] for row in angles}) > 1]
+    names = {k: f"p{i}" for i, k in enumerate(varying)}
+    # Only rz angles vary (the skeletons match), so no None is ever dropped here.
+    values = tuple(tuple(a for a in (row[k] for k in varying) if a is not None) for row in angles)
+    return SweptProgram(_program(first, names, list(names.values())), values)
+
+
+def _program(circuit: Circuit, parameters: dict[int, str], inputs: list[str]) -> str:
+    """OpenQASM 3 for `circuit`, with operation k's angle written as `parameters[k]`."""
     n = circuit.n_qubits
-    lines = ["OPENQASM 3.0;", 'include "stdgates.inc";', f"qubit[{n}] q;", f"bit[{n}] c;"]
-    for op in circuit.ops:
+    lines = ["OPENQASM 3.0;", 'include "stdgates.inc";']
+    lines += [f"input float[64] {name};" for name in inputs]
+    lines += [f"qubit[{n}] q;", f"bit[{n}] c;"]
+    for k, op in enumerate(circuit.ops):
         if isinstance(op, Measure):
             lines.append(f"c[{op.clbit}] = measure q[{op.qubit}];")
             continue
         if op.name not in NATIVE:
             raise ValueError(f"{op.name} is not a native gate; lower the circuit first")
-        # repr round-trips a float exactly; a rounded angle would be a different gate.
-        params = f"({', '.join(repr(float(p)) for p in op.params)})" if op.params else ""
+        if k in parameters:
+            params = f"({parameters[k]})"
+        else:
+            # repr round-trips a float exactly; a rounded angle would be a different gate.
+            params = f"({', '.join(repr(float(p)) for p in op.params)})" if op.params else ""
         qubits = ", ".join(f"q[{q}]" for q in op.qubits)
         lines.append(f"{op.name}{params} {qubits};")
     return "\n".join(lines) + "\n"
+
+
+def _skeleton(op: Op) -> tuple[object, ...]:
+    """An operation less its rz angle: what swept circuits must share."""
+    if isinstance(op, Measure):
+        return ("measure", op.qubit, op.clbit)
+    return (op.name, op.qubits, () if op.name == "rz" else op.params)
+
+
+def _angle(op: Op) -> float | None:
+    """The rz angle of `op`, or None for anything else."""
+    return float(op.params[0]) if isinstance(op, Gate) and op.name == "rz" else None
+
+
+def _euler(u: Matrix) -> tuple[float, float, float]:
+    """(φ, θ, λ) with u ∝ RZ(φ)·RY(θ)·RZ(λ) and θ ∈ [0, π]."""
+    # Divide out the phase so u is in SU(2): u = [[a, −b*], [b, a*]].
+    v = u / cmath.sqrt(np.linalg.det(u))
+    a, b = complex(v[0, 0]), complex(v[1, 0])
+    # atan2 stays accurate at both ends, where arccos(|a|) would lose half the digits.
+    theta = 2 * math.atan2(abs(b), abs(a))
+    # a = e^{−i(φ+λ)/2}·cos(θ/2) and b = e^{i(φ−λ)/2}·sin(θ/2). An entry that vanishes leaves
+    # its phase undefined, and then any value gives the same unitary.
+    total = -2 * cmath.phase(a)  # φ + λ
+    diff = 2 * cmath.phase(b)  # φ − λ
+    return (total + diff) / 2, theta, (total - diff) / 2
 
 
 def _lower_unitary(u: Matrix, q: int) -> list[Gate]:
@@ -130,23 +212,13 @@ def _lower_unitary(u: Matrix, q: int) -> list[Gate]:
     Writes u ∝ RZ(φ)·RY(θ)·RZ(λ) with θ ∈ [0, π], then uses RY(θ) = RZ(π/2)·RX(θ)·RZ(−π/2)
     and SX ∝ RX(π/2) to pick the shortest native form for θ.
     """
-    # Divide out the phase so u is in SU(2): u = [[a, −b*], [b, a*]].
-    v = u / cmath.sqrt(np.linalg.det(u))
-    a, b = complex(v[0, 0]), complex(v[1, 0])
-    # atan2 stays accurate at both ends, where arccos(|a|) would lose half the digits.
-    theta = 2 * math.atan2(abs(b), abs(a))
-    # From u's entries: a = e^{−i(φ+λ)/2}·cos(θ/2) and b = e^{i(φ−λ)/2}·sin(θ/2). An entry
-    # that vanishes leaves its phase undefined, and the cases below never read it.
-    total = -2 * cmath.phase(a)  # φ + λ
-    diff = 2 * cmath.phase(b)  # φ − λ
-
+    phi, theta, lam = _euler(u)
     if theta < SNAP:
         # Diagonal: RZ(φ)·RZ(λ).
-        return _rz(total, q)
+        return _rz(phi + lam, q)
     if theta > math.pi - SNAP:
         # Antidiagonal: RY(π) ∝ X·RZ(π), and RZ(φ)·X = X·RZ(−φ), so u ∝ X·RZ(π + λ − φ).
-        return [*_rz(math.pi - diff, q), Gate("x", (q,))]
-    phi, lam = (total + diff) / 2, (total - diff) / 2
+        return [*_rz(math.pi - (phi - lam), q), Gate("x", (q,))]
     if abs(theta - math.pi / 2) < SNAP:
         # RZ(φ)·RZ(π/2)·SX·RZ(−π/2)·RZ(λ).
         return [*_rz(lam - math.pi / 2, q), Gate("sx", (q,)), *_rz(phi + math.pi / 2, q)]
@@ -160,14 +232,15 @@ def _lower_unitary(u: Matrix, q: int) -> list[Gate]:
     ]
 
 
-def _rz(angle: float, q: int) -> list[Gate]:
-    """RZ(angle) on `q`, with the angle in (−π, π], or nothing if it is the identity.
-
-    RZ(α + 2π) = −RZ(α), the same gate up to global phase, so any angle reduces to (−π, π].
-    """
+def _wrap(angle: float) -> float:
+    """An rz angle in (−π, π]: RZ(α + 2π) = −RZ(α), the same gate up to global phase."""
     wrapped = math.remainder(angle, 2 * math.pi)
-    if wrapped <= -math.pi:
-        wrapped += 2 * math.pi
+    return wrapped + 2 * math.pi if wrapped <= -math.pi else wrapped
+
+
+def _rz(angle: float, q: int) -> list[Gate]:
+    """RZ(angle) on `q`, with the angle in (−π, π], or nothing if it is the identity."""
+    wrapped = _wrap(angle)
     if abs(wrapped) < SNAP:
         return []
     return [Gate("rz", (q,), (wrapped,))]
