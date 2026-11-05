@@ -108,13 +108,12 @@ v0.3.2: every defect found by the review of v0.3 as released is fixed: a committ
 
 ## v0.4 — The certified coin
 
-`#·········` 7% · 1 of 14 done · due 2026-12-27
+`##········` 14% · 2 of 14 done · due 2026-12-27
 
 A Bell test run on real hardware, with the measurement settings chosen by the v0.3 coin,
 
 ### backlog
 
-- [ ] [`0037`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0037-lower-two-qubit-gates-to-the-backend-s-native-entangler.md) Lower two-qubit gates to the backend's native entangler <sup>feature · p0 · compile</sup>
 - [ ] [`0038`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0038-choose-the-best-connected-qubit-pair-from-calibration.md) Choose the best-connected qubit pair from calibration <sup>feature · p0 · compile</sup>
 - [ ] [`0039`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0039-run-two-coins-that-always-agree.md) Run two coins that always agree <sup>feature · p1 · chsh</sup>
 - [ ] [`0040`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0040-how-do-we-run-chsh-with-per-shot-random-settings-within-budget.md) How do we run CHSH with per-shot random settings within budget? <sup>spike · p0 · chsh</sup>
@@ -130,6 +129,7 @@ A Bell test run on real hardware, with the measurement settings chosen by the v0
 
 ### done
 
+- [x] [`0037`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0037-lower-two-qubit-gates-to-the-backend-s-native-entangler.md) Lower two-qubit gates to the backend's native entangler <sup>feature · p0 · compile</sup>
 - [x] [`0086`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0086-keep-agent-instructions-out-of-the-repository.md) Keep agent instructions out of the repository <sup>chore · p2 · tooling</sup>
 
 ## v1.0 — The promise

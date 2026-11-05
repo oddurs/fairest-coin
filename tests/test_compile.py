@@ -8,7 +8,7 @@ from qiskit import qasm3
 from qiskit.quantum_info import Operator
 
 from coin.circuit import ARITY, Circuit, Gate, Measure
-from coin.compile import NATIVE, SNAP, lower, to_qasm
+from coin.compile import NATIVE, SNAP, coupled_pairs, lower, require_coupled, to_qasm
 from coin.gates import matrix
 from coin.sim import simulate
 
@@ -89,13 +89,14 @@ def test_lowered_circuit_equals_the_original(circuit: Circuit) -> None:
 
 
 @given(circuits(max_qubits=3))
-def test_lowering_emits_only_native_gates_and_passes_two_qubit_gates_through(
+def test_lowering_emits_only_native_gates_and_one_cz_per_two_qubit_gate(
     circuit: Circuit,
 ) -> None:
     lowered = lower(circuit)
-    assert set(gate_names(lowered)) <= {"rz", "sx", "x", *TWO_QUBIT}
-    two_qubit = [op for op in circuit.ops if isinstance(op, Gate) and op.name in TWO_QUBIT]
-    assert [op for op in lowered.ops if isinstance(op, Gate) and op.name in TWO_QUBIT] == (
+    assert set(gate_names(lowered)) <= NATIVE
+    # Each cx becomes one cz on the same qubits; a cz stays as it is.
+    two_qubit = [op.qubits for op in circuit.ops if isinstance(op, Gate) and op.name in TWO_QUBIT]
+    assert [op.qubits for op in lowered.ops if isinstance(op, Gate) and op.name == "cz"] == (
         two_qubit
     )
 
@@ -190,8 +191,15 @@ def test_gates_stay_on_their_side_of_two_qubit_gates_and_measurements() -> None:
         ("rz", (0,)),
         ("sx", (0,)),
         ("rz", (0,)),
-        ("x", (1,)),
-        ("cx", (0, 1)),
+        # x, then the Hadamard before the cz, merge into one run on the target.
+        ("rz", (1,)),
+        ("sx", (1,)),
+        ("rz", (1,)),
+        ("cz", (0, 1)),
+        # The Hadamard after it starts the next run, which the second cz ends.
+        ("rz", (1,)),
+        ("sx", (1,)),
+        ("rz", (1,)),
         ("rz", (0,)),
         ("cz", (1, 0)),
         ("measure", (0,)),
@@ -234,22 +242,9 @@ def test_qasm_keeps_every_digit_of_an_angle() -> None:
     assert "rz(0.30000000000000004) q[0];" in to_qasm(Circuit(1).rz(angle, 0))
 
 
-def native_only(circuit: Circuit) -> Circuit:
-    # cx is not native and lowering two-qubit gates is 0037's job; cz conjugated by
-    # Hadamards on the target is cx, so swapping it in keeps the circuit's meaning.
-    ops = []
-    for op in circuit.ops:
-        if isinstance(op, Gate) and op.name == "cx":
-            target = op.qubits[1]
-            ops += [Gate("h", (target,)), Gate("cz", op.qubits), Gate("h", (target,))]
-        else:
-            ops.append(op)
-    return Circuit(circuit.n_qubits, tuple(ops))
-
-
 @given(circuits(max_qubits=3))
 def test_qasm_parses_in_qiskit_to_the_same_unitary(circuit: Circuit) -> None:
-    lowered = lower(native_only(circuit))
+    lowered = lower(circuit)
     parsed = qasm3.loads(to_qasm(lowered))
     assert parsed.num_qubits == circuit.n_qubits
     # Both use little-endian order, so the matrices compare with no qubit reversal.
@@ -293,3 +288,41 @@ def test_a_small_real_rz_is_kept() -> None:
 def test_qasm_keeps_two_qubit_operand_order() -> None:
     # cz is symmetric, so only the text can show the order; it will matter for asymmetric gates.
     assert "cz q[1], q[0];" in to_qasm(Circuit(2).cz(1, 0))
+
+
+def test_the_bell_circuit_lowers_to_one_cz() -> None:
+    bell = Circuit(2).h(0).cx(0, 1)
+    lowered = lower(bell)
+    assert gate_names(lowered).count("cz") == 1
+    assert set(gate_names(lowered)) <= NATIVE
+    # (|00⟩ + |11⟩)/√2, up to global phase.
+    state = simulate(lowered)
+    phase = state[0] / abs(state[0])
+    assert np.allclose(state / phase, np.array([1, 0, 0, 1]) / math.sqrt(2), atol=EXACT)
+
+
+def test_the_coupled_pairs_come_from_the_calibrations_cz_entries() -> None:
+    calibration = {
+        "gates": [
+            {"gate": "cz", "qubits": [72, 73]},
+            {"gate": "cz", "qubits": [73, 72]},
+            {"gate": "sx", "qubits": [5]},
+            {"gate": "rzz", "qubits": [1, 2]},
+        ]
+    }
+    assert coupled_pairs(calibration) == {frozenset((72, 73))}
+    assert coupled_pairs({}) == frozenset()
+
+
+@pytest.mark.parametrize("gate", ["cx", "cz"])
+def test_a_gate_on_an_uncoupled_pair_is_refused_naming_both_qubits(gate: str) -> None:
+    circuit = lower(Circuit(2).h(0).gate(gate, 0, 1))
+    coupled = frozenset({frozenset((72, 73))})
+    require_coupled(circuit, (72, 73), coupled)
+    require_coupled(circuit, (73, 72), coupled)  # a pair is coupled both ways
+    with pytest.raises(ValueError, match="physical qubits 72 and 74: they are not coupled"):
+        require_coupled(circuit, (72, 74), coupled)
+
+
+def test_a_single_qubit_circuit_needs_no_coupling() -> None:
+    require_coupled(lower(Circuit(1).h(0)), (5,), frozenset())
