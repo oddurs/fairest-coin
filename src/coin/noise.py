@@ -62,13 +62,30 @@ def thermal_relaxation(t1: float, t2: float, duration: float, qubit: int) -> tup
 def depolarizing(p: float, qubit: int) -> Channel:
     """ρ → (1-p)·ρ + p·I/2, Qiskit's convention: with probability p the qubit is scrambled."""
     _check_probability("p", p)
-    paulis = (
-        np.array([[0, 1], [1, 0]], dtype=np.complex128),
-        np.array([[0, -1j], [1j, 0]], dtype=np.complex128),
-        np.array([[1, 0], [0, -1]], dtype=np.complex128),
-    )
     identity = math.sqrt(1 - 3 * p / 4) * np.eye(2, dtype=np.complex128)
-    return Channel((identity, *(math.sqrt(p / 4) * pauli for pauli in paulis)), (qubit,))
+    return Channel((identity, *(math.sqrt(p / 4) * pauli for pauli in _PAULIS)), (qubit,))
+
+
+_PAULIS = (
+    np.array([[0, 1], [1, 0]], dtype=np.complex128),
+    np.array([[0, -1j], [1j, 0]], dtype=np.complex128),
+    np.array([[1, 0], [0, -1]], dtype=np.complex128),
+)
+
+
+def pair_depolarizing(p: float, qubits: tuple[int, int]) -> Channel:
+    """ρ → (1-p)·ρ + p·I/4 on two qubits: with probability p the pair is scrambled."""
+    _check_probability("p", p)
+    one = (np.eye(2, dtype=np.complex128), *_PAULIS)
+    scrambled = (
+        math.sqrt(p / 16) * np.kron(a, b).astype(np.complex128)
+        for i, a in enumerate(one)
+        for j, b in enumerate(one)
+        if (i, j) != (0, 0)
+    )
+    return Channel(
+        (math.sqrt(1 - 15 * p / 16) * np.eye(4, dtype=np.complex128), *scrambled), qubits
+    )
 
 
 def average_infidelity(channels: tuple[Channel, ...]) -> float:
@@ -98,6 +115,23 @@ def gate_depolarizing(gate_error: float, relaxation: tuple[Channel, ...]) -> flo
     if gate_error <= relaxed:
         return 0.0
     return min(1.0, 2 * (gate_error - relaxed) / (1 - 2 * relaxed))
+
+
+def pair_gate_depolarizing(
+    gate_error: float, relaxation: tuple[tuple[Channel, ...], tuple[Channel, ...]]
+) -> float:
+    """`gate_depolarizing` for a two-qubit gate, each qubit relaxing on its own meanwhile.
+
+    The two relaxations compose as a product, whose entanglement fidelity is the product of
+    each one's, F_e = 1 − (3/2)·r per qubit. In d = 4 dimensions F_avg = (4·F_e + 1)/5, and
+    the depolarizing part is p = d(r − r₁)/(d(1 − r₁) − 1) (Qiskit Aer builds its device noise
+    the same way; d = 2 gives `gate_depolarizing`).
+    """
+    entanglement = math.prod(1 - 1.5 * average_infidelity(r) for r in relaxation)
+    relaxed = 1 - (4 * entanglement + 1) / 5
+    if gate_error <= relaxed:
+        return 0.0
+    return min(1.0, 4 * (gate_error - relaxed) / (4 * (1 - relaxed) - 1))
 
 
 @dataclass(frozen=True)
@@ -249,6 +283,38 @@ def _qubit_noise(
         readout_length_ns=None if length is None else _in_ns(length),
         gates=calibrated,
     )
+
+
+def pair_gates(calibration: Mapping[str, Any]) -> dict[tuple[int, int], GateCalibration]:
+    """Each coupled pair's `cz`, keyed (lower, higher), the worse of its two directions.
+
+    A pair whose `cz` lacks a length or an error, has an unknown unit, or is marked failed is
+    left out: a guessed number would be a prediction the hardware could not test.
+    """
+    found: dict[tuple[int, int], GateCalibration] = {}
+    broken: set[tuple[int, int]] = set()
+    for gate in calibration.get("gates", []):
+        if gate.get("gate") != "cz" or len(gate.get("qubits", [])) != 2:
+            continue
+        pair = (min(gate["qubits"]), max(gate["qubits"]))
+        params = {p["name"]: p for p in gate.get("parameters", [])}
+        try:
+            if "gate_length" not in params or "gate_error" not in params:
+                raise _UnusableError("cz calibration lacks gate_length or gate_error")
+            here = GateCalibration(_in_ns(params["gate_length"]), _number(params["gate_error"]))
+        except _UnusableError:
+            broken.add(pair)
+            continue
+        if not 0 <= here.error < BROKEN:
+            broken.add(pair)
+        elif pair in found:
+            other = found[pair]
+            found[pair] = GateCalibration(
+                max(here.length_ns, other.length_ns), max(here.error, other.error)
+            )
+        else:
+            found[pair] = here
+    return {pair: cal for pair, cal in found.items() if pair not in broken}
 
 
 def predict_tails(noise: QubitNoise, circuit: Circuit, *, measurement_decay: bool = False) -> float:
