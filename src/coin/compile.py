@@ -1,9 +1,15 @@
 """Lowering circuits to the gates IBM hardware runs, and writing them as OpenQASM 3.
 
 IBM's Heron backends run `rz`, `sx`, `x` and `cz` natively and nothing else. `lower`
-rewrites every single-qubit gate into that set: each run of consecutive single-qubit gates
-on a qubit is multiplied into one 2×2 unitary, which becomes at most rz·sx·rz·sx·rz (the
-ZXZXZ form), shortened where the unitary allows. Two-qubit gates pass through unchanged.
+rewrites every gate into that set: each run of consecutive single-qubit gates on a qubit is
+multiplied into one 2×2 unitary, which becomes at most rz·sx·rz·sx·rz (the ZXZXZ form),
+shortened where the unitary allows. A `cx` becomes one `cz` between Hadamards on its
+target, and those Hadamards join the runs either side, so the Bell circuit's H, CX costs
+one `cz` and no more pulses than it must.
+
+The hardware has a fixed set of coupled pairs, and a two-qubit gate can only run on one of
+them. `require_coupled` refuses any other pair rather than routing it: routing would insert
+SWAPs, three more `cz` each, and the circuit run would not be the circuit written.
 
 Equality is up to global phase, which no measurement can see. `rz` is free on hardware (a
 frame change in the control electronics, not a pulse), so the shortening that matters is
@@ -16,6 +22,8 @@ not part of the program: the hardware adapter passes the layout to Qiskit's tran
 
 import cmath
 import math
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
@@ -29,12 +37,15 @@ NATIVE: frozenset[str] = frozenset({"rz", "sx", "x", "cz"})
 # (≈1e-15 after merging a run of gates), never a rotation anyone asked for.
 SNAP = 1e-12
 
+_H = matrix(Gate("h", (0,)))
+
 
 def lower(circuit: Circuit) -> Circuit:
-    """`circuit` with every single-qubit gate rewritten as native `rz`, `sx` and `x`.
+    """`circuit` rewritten in native `rz`, `sx`, `x` and `cz`.
 
     Consecutive single-qubit gates on a qubit merge into one unitary before lowering, so
-    gate counts may shrink. Two-qubit gates and measurements stay in place and keep their
+    gate counts may shrink. Each `cx` becomes one `cz`, since CX = (I⊗H)·CZ·(I⊗H) with the
+    Hadamards on the target. Two-qubit gates and measurements stay in place and keep their
     order relative to the gates on the qubits they touch. The result equals `circuit` up to
     global phase.
     """
@@ -53,11 +64,43 @@ def lower(circuit: Circuit) -> Circuit:
         elif ARITY[op.name][0] == 1:
             q = op.qubits[0]
             pending[q] = matrix(op) @ pending.get(q, np.eye(2, dtype=np.complex128))
+        elif op.name == "cx":
+            # The Hadamard before joins the target's run so far; the one after starts its
+            # next run, so both merge with whatever surrounds them.
+            target = op.qubits[1]
+            pending[target] = _H @ pending.get(target, np.eye(2, dtype=np.complex128))
+            flush(op.qubits)
+            ops.append(Gate("cz", op.qubits))
+            pending[target] = _H.copy()
         else:
             flush(op.qubits)
             ops.append(op)
     flush(tuple(sorted(pending)))
     return Circuit(circuit.n_qubits, tuple(ops))
+
+
+def coupled_pairs(calibration: dict[str, Any]) -> frozenset[frozenset[int]]:
+    """The physical qubit pairs a backend's calibration lists its native `cz` on."""
+    return frozenset(
+        frozenset(gate["qubits"])
+        for gate in calibration.get("gates", [])
+        if gate.get("gate") == "cz" and len(gate.get("qubits", [])) == 2
+    )
+
+
+def require_coupled(
+    circuit: Circuit, layout: Sequence[int], coupled: frozenset[frozenset[int]]
+) -> None:
+    """Raise ValueError naming both physical qubits of the first two-qubit gate whose pair
+    `layout` does not place on a coupled pair. Nothing is ever routed."""
+    for op in circuit.ops:
+        if isinstance(op, Gate) and len(op.qubits) == 2:
+            a, b = (layout[q] for q in op.qubits)
+            if frozenset((a, b)) not in coupled:
+                raise ValueError(
+                    f"{op.name} on physical qubits {a} and {b}: they are not coupled on this "
+                    "backend, and circuits are never routed; choose a coupled pair"
+                )
 
 
 def to_qasm(circuit: Circuit) -> str:

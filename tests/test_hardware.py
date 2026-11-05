@@ -720,3 +720,15 @@ def test_losing_a_race_to_another_recovery_is_not_an_error(
     directory = recover(Submits, "jobX", tmp_path)
     assert directory.name.endswith("jobX")
     assert not list(tmp_path.glob(".pending-*"))
+
+
+def test_a_submission_on_an_uncoupled_pair_is_refused_before_hardware(tmp_path: Path) -> None:
+    from coin.compile import lower  # noqa: PLC0415
+
+    bell = lower(Circuit(2).h(0).cx(0, 1).measure_all())
+    calibration = {**CALIBRATION, "gates": [{"gate": "cz", "qubits": [139, 140]}]}
+    plan(circuit=bell, layout=(139, 140), calibration=calibration)
+    transport = FakeTransport(("00",))
+    with pytest.raises(ValueError, match="physical qubits 139 and 141"):
+        submit(transport, plan(circuit=bell, layout=(139, 141), calibration=calibration), tmp_path)
+    assert transport.submitted == []

@@ -32,7 +32,7 @@ from typing import Any, Protocol
 from coin import __version__, durable
 from coin.archive import ArchiveError, Prediction, Run, write_run
 from coin.circuit import Circuit
-from coin.compile import to_qasm
+from coin.compile import coupled_pairs, require_coupled, to_qasm
 
 
 @dataclass(frozen=True)
@@ -96,6 +96,7 @@ class Submission:
         if self.shots < 1:
             raise ValueError(f"shots must be at least 1, got {self.shots}")
         to_qasm(self.circuit)  # raises now if anything is not native
+        require_coupled(self.circuit, self.layout, coupled_pairs(self.calibration))
 
 
 def submit(
