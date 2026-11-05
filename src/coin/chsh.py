@@ -21,6 +21,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
+
 from coin.circuit import Circuit, Gate, Measure
 from coin.compile import lower, zxzxz
 from coin.gates import matrix
@@ -38,6 +40,7 @@ from coin.noise import (
     pair_gates,
     thermal_relaxation,
 )
+from coin.readout import ReadoutCounts
 from coin.sim import Channel, probabilities
 
 ALICE = (0.0, math.pi / 2)
@@ -244,6 +247,63 @@ def predict_s(
         for setting, native in (circuits or lowered_circuits()).items()
     }
     return s_value(correlations)
+
+
+# How far the published cz error is let range: no error bar comes with it, and spike 0069
+# found the calibration describes the hardware loosely. A stated assumption, not a fit.
+CZ_ERROR_FACTOR = 2.0
+# Draws behind the interval: its 2.5% and 97.5% points move by about 0.01 at this many.
+INTERVAL_DRAWS = 400
+
+
+@dataclass(frozen=True)
+class PairNoise:
+    """Everything the model knows about a pair before readout: each qubit, and their cz."""
+
+    alice: QubitNoise
+    bob: QubitNoise
+    cz: GateCalibration
+
+
+def s_interval(
+    noise: PairNoise,
+    readout: tuple[ReadoutCounts, ReadoutCounts],
+    rounds: int,
+    rng: np.random.Generator,
+) -> tuple[float, float]:
+    """A 95% prediction interval for the S a run of `rounds` swept rounds will measure.
+
+    Each draw takes each readout error from its posterior given the counts (Beta, with
+    Jeffreys' prior), the cz error scaled by a log-uniform factor in [1/F, F] with
+    F = CZ_ERROR_FACTOR, predicts the four correlations for the swept circuits, and adds the
+    sampling scatter of `rounds` rounds split evenly. The interval is the middle 95% of the
+    draws.
+    """
+    circuits = setting_circuits()
+    samples = []
+    for _ in range(INTERVAL_DRAWS):
+        drawn = tuple(
+            Readout(
+                float(rng.beta(c.ones_given_0 + 0.5, c.shots_0 - c.ones_given_0 + 0.5)),
+                float(rng.beta(c.zeros_given_1 + 0.5, c.shots_1 - c.zeros_given_1 + 0.5)),
+            )
+            for c in readout
+        )
+        factor = math.exp(rng.uniform(-math.log(CZ_ERROR_FACTOR), math.log(CZ_ERROR_FACTOR)))
+        gate = GateCalibration(noise.cz.length_ns, min(noise.cz.error * factor, 0.75))
+        correlations = {
+            setting: correlation(
+                predict_distribution(
+                    noise.alice, noise.bob, gate, (drawn[0], drawn[1]), circuits[setting]
+                )
+            )
+            for setting in SETTINGS
+        }
+        per_setting = rounds / len(SETTINGS)
+        error = math.sqrt(sum((1 - e * e) / per_setting for e in correlations.values()))
+        samples.append(s_value(correlations) + float(rng.normal(0, error)))
+    low, high = np.percentile(samples, [2.5, 97.5])
+    return float(low), float(high)
 
 
 def rank_pairs(

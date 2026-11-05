@@ -8,20 +8,28 @@ The pair is the one `chsh.rank_pairs` scores best, unless one is named; the pred
 the same noise model, so the agreement rate this run measures also tests that model.
 """
 
+import dataclasses
+import gzip
+import hashlib
+import json
 import math
 import secrets
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
-from coin import chsh
+import numpy as np
+
+from coin import chsh, durable
 from coin.archive import Prediction, Run
 from coin.chipmap import MAX_SHOTS, estimate_qpu_seconds, tails_by_qubit
 from coin.circuit import Circuit, Gate
-from coin.compile import lower
+from coin.compile import lower, sweep_qasm
 from coin.hardware import Submission, Sweep
 from coin.noise import GateCalibration, QubitNoise, Readout, model_from_calibration, pair_gates
+from coin.readout import ReadoutCounts
 
 PURPOSE = "bell"
 # A measured rate within this many standard deviations of its prediction counts as a hit.
@@ -184,6 +192,12 @@ class ChshPlan:
     s: float  # predicted, for the swept circuits that actually run
     standard_error: float  # expected at this many rounds, from the predicted correlations
     readout_source: tuple[str, str]
+    # The 95% prediction interval, when both qubits' readout was measured.
+    interval: tuple[float, float] | None
+
+
+# Spike 0040: a job costs about 2 s, and each swept round about 1 ms (one 2,000-round job).
+_SECONDS_PER_SWEPT_ROUND = 1e-3
 
 
 def random_choices(rounds: int) -> tuple[int, ...]:
@@ -197,19 +211,22 @@ def plan_chsh(
     choices: Sequence[int],
     *,
     pair: tuple[int, int] | None = None,
-    measured: Mapping[int, Readout] | None = None,
+    measured: Mapping[int, ReadoutCounts] | None = None,
 ) -> ChshPlan:
     """The CHSH test on the best pair (or `pair`), round i run at `chsh.SETTINGS[choices[i]]`.
 
     All four settings run in one job, interleaved round by round as `choices` orders them,
     so drift during the job touches every correlation alike. The bound S_low assumes the
-    choices were uniform and independent of the devices.
+    choices were uniform and independent of the devices. With both qubits' readout
+    `measured`, the prediction carries a 95% interval (`chsh.s_interval`), drawn with a seed
+    taken from the choices, so the file alone reproduces it.
     """
     rounds = len(choices)
     if not 1 <= rounds <= MAX_SHOTS:
         raise ValueError(f"rounds must be between 1 and {MAX_SHOTS:,}, got {rounds}")
     picked = tuple(choices)
-    chosen = _choose(calibration, pair, measured)
+    measured = measured or {}
+    chosen = _choose(calibration, pair, {q: c.readout for q, c in measured.items()})
     a, b = chosen.pair
     circuits = chsh.setting_circuits()
     swept = tuple(circuits[setting] for setting in chsh.SETTINGS)
@@ -220,7 +237,17 @@ def plan_chsh(
     s = chsh.s_value(correlations)
     per_setting = rounds / len(chsh.SETTINGS)
     error = math.sqrt(sum((1 - e * e) / per_setting for e in correlations.values()))
-    values = {
+    interval = None
+    if a in measured and b in measured:
+        seed = int.from_bytes(hashlib.sha256(_digits(picked).encode()).digest()[:8], "big")
+        alice, bob, cz, _ = chosen.noise
+        interval = chsh.s_interval(
+            chsh.PairNoise(alice, bob, cz),
+            (measured[a], measured[b]),
+            rounds,
+            np.random.default_rng(seed),
+        )
+    values: dict[str, Any] = {
         "purpose": CHSH_PURPOSE,
         "model": "relaxation and depolarizing per gate, cz included, then readout",
         "pair": [a, b],
@@ -231,10 +258,19 @@ def plan_chsh(
             str(a): chosen.score.readout_source[0],
             str(b): chosen.score.readout_source[1],
         },
-        "settings": "uniform from the operating system's generator" if choices is None else "given",
         "epsilon": EPSILON,
         "rounds": rounds,
+        # The program every round runs, so a later run can show it ran this one.
+        "program_sha256": hashlib.sha256(sweep_qasm(swept).qasm.encode()).hexdigest(),
     }
+    if interval is not None:
+        values["interval"] = list(interval)
+        values["interval_assumptions"] = (
+            "readout errors drawn from their Beta posteriors given the readout runs' counts; "
+            f"cz error scaled by a log-uniform factor in [1/{chsh.CZ_ERROR_FACTOR:g}, "
+            f"{chsh.CZ_ERROR_FACTOR:g}]; sampling scatter of {rounds:,} rounds; middle 95%"
+        )
+        values["readout_counts"] = {str(q): dataclasses.asdict(measured[q]) for q in (a, b)}
     submission = Submission(
         circuit=swept[0],
         backend=backend,
@@ -244,23 +280,91 @@ def plan_chsh(
         prediction=Prediction(written_at=datetime.now(UTC), values=values),
         sweep=Sweep(swept, picked),
     )
-    return ChshPlan(submission, (a, b), s, error, chosen.score.readout_source)
+    return ChshPlan(submission, (a, b), s, error, chosen.score.readout_source, interval)
 
 
 def chsh_summary(chosen: ChshPlan) -> str:
     a, b = chosen.pair
     rounds = chosen.submission.shots
+    seconds = estimate_qpu_seconds(0) + rounds * _SECONDS_PER_SWEPT_ROUND
+    interval = (
+        f", 95% interval [{chosen.interval[0]:.3f}, {chosen.interval[1]:.3f}]"
+        if chosen.interval
+        else " (no interval without measured readout)"
+    )
     return "\n".join(
         [
             f"backend      {chosen.submission.backend}",
             f"pair         {a}-{b}; readout {chosen.readout_source[0]} for {a}, "
             f"{chosen.readout_source[1]} for {b}",
             f"settings     one of four per round, all in one job: {rounds:,} rounds",
-            f"predicted    S = {chosen.s:.3f} ± {chosen.standard_error:.3f}",
-            f"estimated    ~{estimate_qpu_seconds(rounds):.0f} QPU seconds, if a swept round "
-            "costs what a shot does",
+            f"predicted    S = {chosen.s:.3f} ± {chosen.standard_error:.3f}{interval}",
+            f"estimated    ~{seconds:.0f} QPU seconds",
         ]
     )
+
+
+def save_prediction(chosen: ChshPlan, directory: Path) -> Path:
+    """Write the whole plan to a new file in `directory`, to be committed before the run.
+
+    Everything the run will use is in it: the backend, the pair, the calibration snapshot,
+    every round's setting, and the prediction with its interval.
+    """
+    submission = chosen.submission
+    if submission.sweep is None:
+        raise ValueError("only a swept CHSH plan is saved as a prediction")
+    written = submission.prediction.written_at
+    data = {
+        "backend": submission.backend,
+        "pair": list(chosen.pair),
+        "choices": _digits(submission.sweep.choices),
+        "calibration": submission.calibration,
+        "prediction": {"written_at": written.isoformat(), "values": submission.prediction.values},
+    }
+    durable.make_directory(directory)
+    path = directory / f"{written:%Y-%m-%dT%H%M%S}-chsh-{submission.backend}.json.gz"
+    if path.exists():
+        raise ValueError(f"{path} already exists")
+    durable.replace(path, gzip.compress(json.dumps(data, sort_keys=True).encode(), mtime=0))
+    return path
+
+
+def load_prediction(path: Path) -> ChshPlan:
+    """The plan a saved prediction holds, rebuilt to run exactly as written."""
+    data = json.loads(gzip.decompress(path.read_bytes()))
+    values = data["prediction"]["values"]
+    circuits = chsh.setting_circuits()
+    swept = tuple(circuits[setting] for setting in chsh.SETTINGS)
+    program = hashlib.sha256(sweep_qasm(swept).qasm.encode()).hexdigest()
+    if values.get("program_sha256") != program:
+        raise ValueError(
+            f"{path} was predicted for another program than this version would run; predict again"
+        )
+    choices = tuple(int(k) for k in data["choices"])
+    a, b = data["pair"]
+    interval = tuple(values["interval"]) if "interval" in values else None
+    submission = Submission(
+        circuit=swept[0],
+        backend=data["backend"],
+        layout=(a, b),
+        shots=len(choices),
+        calibration=data["calibration"],
+        prediction=Prediction(datetime.fromisoformat(data["prediction"]["written_at"]), values),
+        sweep=Sweep(swept, choices),
+    )
+    source = values["readout_source"]
+    return ChshPlan(
+        submission,
+        (a, b),
+        values["s"],
+        values["standard_error"],
+        (source[str(a)], source[str(b)]),
+        (interval[0], interval[1]) if interval else None,
+    )
+
+
+def _digits(choices: Sequence[int]) -> str:
+    return "".join(str(k) for k in choices)
 
 
 def chsh_report(run: Run) -> str:
@@ -282,6 +386,19 @@ def chsh_report(run: Run) -> str:
         f"S_low        {result.lower_bound(epsilon):.3f} at ε = {epsilon:.1e} "
         f"(classical bound 2, Tsirelson {chsh.TSIRELSON:.3f})",
     ]
+    if "interval" in values:
+        low, high = values["interval"]
+        inside = "inside" if low <= result.s <= high else "outside"
+        lines.append(f"interval     [{low:.3f}, {high:.3f}] predicted: S fell {inside} it")
+    # Drift during the job shows as halves that disagree; each half is its own estimate.
+    half = len(run.memory) // 2
+    for name, part in (("first half", slice(0, half)), ("second half", slice(half, None))):
+        estimate = chsh.estimate(
+            chsh.counts_by_setting(run.memory[part], run.extra["choices"][part])
+        )
+        lines.append(f"{name:<12} S = {estimate.s:.3f} ± {estimate.standard_error:.3f}")
+    if "committed_as" in values:
+        lines.append(f"predicted in commit {values['committed_as']}")
     measured = chsh.correlations_by_setting(counts)
     for (i, j), e in measured.items():
         n = sum(counts[i, j].values())

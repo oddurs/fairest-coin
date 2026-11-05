@@ -8,13 +8,14 @@ import os
 import subprocess
 import sys
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 
-from coin import __version__, bell, chipmap, chsh, harvest, readout
+from coin import __version__, bell, chipmap, chsh, commitment, harvest, readout
 from coin.archive import ArchiveError, load_run
 from coin.chipmap import MAX_SHOTS
 from coin.circuit import Circuit
@@ -694,16 +695,16 @@ def _add_bell(experiments: Any) -> None:
 def _add_chsh(experiments: Any) -> None:
     chsh_ = experiments.add_parser(
         "chsh",
-        help="the CHSH test: S from four settings chosen round by round in one job",
-        description="Run the CHSH test on the coupled pair with the best predicted S (or "
-        "--pair): each round's setting drawn uniformly by the operating system, all four "
-        "interleaved in one job, S predicted first. Needs QISKIT_IBM_TOKEN and "
-        "QISKIT_IBM_INSTANCE. Spends QPU time only with --submit.",
+        help="the CHSH test: predict S, commit the prediction, then measure",
+        description="The CHSH test on the coupled pair with the best predicted S (or --pair), "
+        "each round's setting drawn uniformly by the operating system, all four interleaved "
+        "in one job. --predict writes the whole plan and its predicted S, with a 95%% interval "
+        "from the measured readout, to a file; commit and push it; then --submit --prediction "
+        "FILE runs exactly that plan, and refuses while the file is uncommitted. Needs "
+        "QISKIT_IBM_TOKEN and QISKIT_IBM_INSTANCE. Spends QPU time only with --submit.",
     )
-    chsh_.add_argument("--backend", required=True, metavar="NAME")
-    chsh_.add_argument(
-        "--rounds", type=_at_least(1), required=True, metavar="N", help=f"at most {MAX_SHOTS:,}"
-    )
+    chsh_.add_argument("--backend", metavar="NAME", help="for --dry-run and --predict")
+    chsh_.add_argument("--rounds", type=_at_least(1), metavar="N", help=f"at most {MAX_SHOTS:,}")
     chsh_.add_argument(
         "--pair", nargs=2, type=int, metavar=("A", "B"), help="a coupled pair to use instead"
     )
@@ -716,9 +717,22 @@ def _add_chsh(experiments: Any) -> None:
     )
     mode = chsh_.add_mutually_exclusive_group(required=True)
     mode.add_argument(
-        "--dry-run", action="store_true", help="print the plan and its cost; submit nothing"
+        "--dry-run", action="store_true", help="print the plan and its cost; write nothing"
     )
-    mode.add_argument("--submit", action="store_true", help="predict, then submit and archive")
+    mode.add_argument(
+        "--predict", action="store_true", help="write the plan and its prediction to a file"
+    )
+    mode.add_argument(
+        "--submit", action="store_true", help="run a committed prediction and archive the run"
+    )
+    chsh_.add_argument("--prediction", type=Path, metavar="FILE", help="for --submit")
+    chsh_.add_argument(
+        "--predictions-dir",
+        type=Path,
+        default=Path("data/predictions"),
+        metavar="DIR",
+        help="where --predict writes",
+    )
     chsh_.add_argument(
         "--runs-dir", type=Path, default=Path("data/runs"), metavar="DIR", help="the archive"
     )
@@ -726,9 +740,28 @@ def _add_chsh(experiments: Any) -> None:
 
 
 def _chsh(args: argparse.Namespace) -> int:
+    if args.submit:
+        if args.prediction is None:
+            print("coin run chsh: --submit runs a committed --prediction FILE", file=sys.stderr)
+            return 2
+        return _chsh_submit(args)
+    if args.backend is None or args.rounds is None:
+        print("coin run chsh: --dry-run and --predict need --backend and --rounds", file=sys.stderr)
+        return 2
+    if args.predict and args.readout is None:
+        print(
+            "coin run chsh: --predict needs --readout: the prediction's interval rests on "
+            "readout measured in the same session",
+            file=sys.stderr,
+        )
+        return 2
+    return _chsh_plan(args)
+
+
+def _chsh_plan(args: argparse.Namespace) -> int:
     try:
         measured_readout = (
-            readout.measured(load_run(args.readout[0]), load_run(args.readout[1]))
+            readout.measured_counts(load_run(args.readout[0]), load_run(args.readout[1]))
             if args.readout
             else None
         )
@@ -742,16 +775,41 @@ def _chsh(args: argparse.Namespace) -> int:
         )
         print(bell.chsh_summary(chosen))
         if args.dry_run:
-            print("dry run: nothing submitted")
+            print("dry run: nothing written, nothing submitted")
             return 0
-        a, b = chosen.pair
+        if chosen.interval is None:
+            print("coin run chsh: the chosen pair's readout was not measured", file=sys.stderr)
+            return 1
+        path = bell.save_prediction(chosen, args.predictions_dir)
+    except ImportError as error:
+        print(f"coin run: install the ibm extra ({error})", file=sys.stderr)
+        return 1
+    except (OSError, ValueError, RuntimeError, ArchiveError) as error:
+        print(f"coin run chsh: {_explain(error)}", file=sys.stderr)
+        return 1
+    print(f"predicted    {path}")
+    print(f"next         commit and push it, then: coin run chsh --submit --prediction {path}")
+    return 0
+
+
+def _chsh_submit(args: argparse.Namespace) -> int:
+    try:
+        chosen = bell.load_prediction(args.prediction)
+        commit = commitment.committed(args.prediction)
+        values = {
+            **chosen.submission.prediction.values,
+            "committed_as": commit,
+            "prediction_file": str(args.prediction),
+        }
+        prediction = replace(chosen.submission.prediction, values=values)
+        submission = replace(chosen.submission, prediction=prediction)
+        print(bell.chsh_summary(chosen))
+        print(f"committed    {commit}")
         command = (
-            f"coin run chsh --backend {args.backend} --rounds {args.rounds} --pair {a} {b} "
-            f"--submit --runs-dir {args.runs_dir}"
+            f"coin run chsh --submit --prediction {args.prediction} --runs-dir {args.runs_dir}"
         )
-        if args.readout:
-            command += f" --readout {args.readout[0]} {args.readout[1]}"
-        directory = submit(transport, chosen.submission, args.runs_dir, submit_script=command)
+        transport = _transport()
+        directory = submit(transport, submission, args.runs_dir, submit_script=command)
         result = bell.chsh_report(load_run(directory))
     except ImportError as error:
         print(f"coin run: install the ibm extra ({error})", file=sys.stderr)

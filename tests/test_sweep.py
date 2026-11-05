@@ -171,28 +171,18 @@ def test_the_chsh_prediction_is_the_analytic_one_for_the_swept_circuits() -> Non
     assert values["rounds"] == 400
 
 
-def test_coin_run_chsh_dry_run_and_submit(
+def test_coin_run_chsh_dry_run_writes_and_submits_nothing(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     transport = SweepTransport(np.random.default_rng(4))
     monkeypatch.setattr(cli, "_transport", lambda: transport)
     argv = ["run", "chsh", "--backend", "fake", "--rounds", "4000", "--runs-dir", str(tmp_path)]
-    code, out, _ = cli_run([*argv, "--dry-run"], capsys)
+    code, out, _ = cli_run([*argv, "--dry-run", "--predictions-dir", str(tmp_path)], capsys)
     assert code == 0
     assert "pair         2-3" in out
-    assert out.rstrip().endswith("dry run: nothing submitted")
+    assert out.rstrip().endswith("dry run: nothing written, nothing submitted")
     assert transport.rows is None
-    code, out, err = cli_run([*argv, "--submit"], capsys)
-    assert code == 0, err
-    assert "S_low" in out
-    (directory,) = tmp_path.iterdir()
-    code, compared, _ = cli_run(["compare", str(directory)], capsys)
-    assert code == 0
-    assert compared.splitlines() == out.splitlines()[-len(compared.splitlines()) :]
-    counts = chsh.counts_by_setting(
-        load_run(directory).memory or (), load_run(directory).extra["choices"]
-    )
-    assert {sum(c.values()) for c in counts.values()} != {0}
+    assert not list(tmp_path.iterdir())
 
 
 def test_counts_by_setting_needs_one_choice_per_shot() -> None:
