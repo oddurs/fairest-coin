@@ -6,8 +6,9 @@ bits is E(a, b) = cos(a − b), and
 
     S = E(a₀, b₀) + E(a₀, b₁) + E(a₁, b₀) − E(a₁, b₁) = 2√2.
 
-Any pre-written list of answers, however clever, keeps |S| ≤ 2. Noise pulls S down toward
-0, so which two qubits run the test decides how far above 2 it can get.
+(Written with the minus sign on E(a₁, b₁); labelling the settings differently moves it, and
+changes nothing.) Any pre-written list of answers, however clever, keeps |S| ≤ 2. Noise
+pulls S down toward 0, so which two qubits run the test decides how far above 2 it can get.
 
 Predicting S for a pair uses the same noise model as the one-qubit coin: relaxation and
 depolarizing for every gate, including the `cz`, then each qubit's readout. The readout
@@ -63,6 +64,61 @@ def s_value(correlations: Mapping[tuple[int, int], float]) -> float:
     """S from the four correlations, keyed by (Alice's setting, Bob's setting)."""
     e = correlations
     return e[0, 0] + e[0, 1] + e[1, 0] - e[1, 1]
+
+
+# Outcome counts for each setting pair, keyed (Alice's setting, Bob's setting), with outcome
+# strings "<Bob's bit><Alice's bit>" as the circuit measures them.
+type Counts = Mapping[tuple[int, int], Mapping[str, int]]
+
+
+@dataclass(frozen=True)
+class Estimate:
+    """S from a run's counts, its standard error, and the CHSH game's tally behind the bound.
+
+    The standard error describes the scatter of S over repeated runs; it is not a soundness
+    bound, and S − 5σ is not a certificate. `lower_bound` is.
+    """
+
+    s: float
+    standard_error: float
+    rounds: int
+    wins: int
+
+    def lower_bound(self, epsilon: float) -> float:
+        """A value S is above, unless a probability-ε accident happened: S_low at ε.
+
+        Each round is a game won when the bits agree, except at settings (1, 1) where they
+        must differ. With settings drawn uniformly, the win probability is w = 1/2 + S/8,
+        and Hoeffding's inequality bounds w from the n rounds without assuming anything about
+        their distribution but independence: P(ŵ − w ≥ t) ≤ e^{−2nt²}. So
+        S_low = 8·(ŵ − √(ln(1/ε)/2n)) − 4.
+        """
+        if not 0 < epsilon < 1:
+            raise ValueError(f"epsilon must lie in (0, 1), got {epsilon}")
+        margin = math.sqrt(math.log(1 / epsilon) / (2 * self.rounds))
+        return 8 * (self.wins / self.rounds - margin) - 4
+
+
+def estimate(counts: Counts) -> Estimate:
+    """S and its standard error from the four settings' counts, and the game's tally.
+
+    Each correlation E = P(agree) − P(differ) is a binomial estimate with variance
+    (1 − E²)/n from its own n shots, and the four are independent, so their variances add.
+    """
+    if set(counts) != {(i, j) for i in (0, 1) for j in (0, 1)}:
+        raise ValueError(f"need counts for all four setting pairs, got {sorted(counts)}")
+    correlations, variance, rounds, wins = {}, 0.0, 0, 0
+    for (i, j), outcomes in counts.items():
+        n = sum(outcomes.values())
+        if n < 1:
+            raise ValueError(f"settings ({i}, {j}) have no shots")
+        agree = sum(k for outcome, k in outcomes.items() if outcome[0] == outcome[1])
+        e = (2 * agree - n) / n
+        correlations[i, j] = e
+        variance += (1 - e * e) / n
+        rounds += n
+        wins += n - agree if (i, j) == (1, 1) else agree
+    return Estimate(s_value(correlations), math.sqrt(variance), rounds, wins)
 
 
 @dataclass(frozen=True)
