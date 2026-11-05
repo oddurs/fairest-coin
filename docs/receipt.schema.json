@@ -19,14 +19,15 @@
     "batch_bits",
     "extractor",
     "entropy_per_bit",
-    "epsilon"
+    "epsilon",
+    "certified"
   ],
   "properties": {
     "outcome": {"type": "string", "enum": ["HEADS", "TAILS"], "description": "HEADS is 0, TAILS is 1."},
     "bit": {"type": "integer", "enum": [0, 1]},
     "flipped_at": {"type": "string", "description": "When the bit was spent, ISO 8601 in UTC."},
     "backend": {"type": "string", "description": "The IBM device the shots ran on."},
-    "qubit": {"type": "integer", "description": "The physical qubit that was flipped."},
+    "qubit": {"type": ["integer", "null"], "description": "The physical qubit that was flipped; null for a certified bit, which comes from a pair (certificate.qubits)."},
     "job_id": {"type": "string", "description": "IBM's job id."},
     "run": {"type": "string", "description": "The archived run's directory under data/runs/."},
     "harvested_at": {"type": "string", "description": "When the batch entered the pool, ISO 8601 in UTC."},
@@ -34,7 +35,22 @@
     "offset": {"type": "integer", "description": "The bit's position in its batch, from 0."},
     "batch_bits": {"type": "integer", "description": "How many bits the batch holds."},
     "extractor": {"type": "string", "enum": ["toeplitz"]},
-    "entropy_per_bit": {"type": "number", "description": "Min-entropy per shot the extraction spent: half the estimate."},
-    "epsilon": {"type": "number", "description": "Distance from uniform, if that min-entropy holds."}
+    "entropy_per_bit": {"type": "number", "description": "Min-entropy per input bit the extraction spent: half the estimate for a harvest, the certified rate's share for a certified bit."},
+    "epsilon": {"type": "number", "description": "Distance from uniform, if that min-entropy holds."},
+    "certified": {"type": "boolean", "description": "Whether a Bell violation vouches for the bit (coin certify), rather than the hardware's noise alone."},
+    "certificate": {
+      "type": "object",
+      "description": "Only on a certified bit: the CHSH run behind it.",
+      "additionalProperties": false,
+      "required": ["qubits", "s", "s_low", "s_epsilon", "rate_per_round", "settings_batches"],
+      "properties": {
+        "qubits": {"type": "array", "items": {"type": "integer"}, "description": "The pair the CHSH test ran on."},
+        "s": {"type": "number", "description": "The measured CHSH value."},
+        "s_low": {"type": "number", "description": "Hoeffding's lower bound on S at s_epsilon."},
+        "s_epsilon": {"type": "number", "description": "The probability S_low is wrong, if rounds are independent."},
+        "rate_per_round": {"type": "number", "description": "Min-entropy of a round's two outcome bits that S_low certifies (Pironio et al., 2010)."},
+        "settings_batches": {"type": "array", "items": {"type": "string"}, "description": "The pool batches whose bits chose the run's settings."}
+      }
+    }
   }
 }

@@ -114,19 +114,28 @@ class Pool:
             durable.replace(self.path / f"{batch}.bits", np.packbits(x).tobytes())
         return batch
 
-    def take(self, n: int) -> list[Draw]:
-        """Spend the next n bits, oldest batch first; EmptyPoolError if there are too few."""
+    def take(self, n: int, *, certified: bool = False) -> list[Draw]:
+        """Spend the next n bits, oldest batch first; EmptyPoolError if there are too few.
+
+        Certified batches (a Bell violation vouches for them) and plain ones are kept apart:
+        `certified` chooses which, so a certified bit is never spent where any bit would do.
+        """
         if n < 1:
             raise ValueError(f"take at least one bit, got {n}")
+        kind, source = ("certified ", "`coin certify`") if certified else ("", "`coin harvest`")
         if not self.path.exists():
-            raise EmptyPoolError(f"the pool has 0 unspent bit(s), {n} needed; run `coin harvest`")
+            raise EmptyPoolError(f"the pool has 0 unspent {kind}bit(s), {n} needed; run {source}")
         with self._locked():
             spent = self._spent()
-            provenance = self._provenances()
+            provenance = {
+                batch: record
+                for batch, record in self._provenances().items()
+                if bool(record.get("certified")) == certified
+            }
             available = sum(int(p["bits"]) - spent.get(b, 0) for b, p in provenance.items())
             if available < n:
                 raise EmptyPoolError(
-                    f"the pool has {available} unspent bit(s), {n} needed; run `coin harvest`"
+                    f"the pool has {available} unspent {kind}bit(s), {n} needed; run {source}"
                 )
             draws: list[tuple[str, int, int]] = []
             needed = n
@@ -213,12 +222,14 @@ def receipt(draw: Draw, flipped_at: datetime) -> dict[str, Any]:
         raise ValueError(f"a receipt is for one flip, got {len(draw.bits)} bits")
     bit = int(draw.bits[0])
     p = draw.provenance
-    return {
+    certified = bool(p.get("certified"))
+    flip = {
         "outcome": "TAILS" if bit else "HEADS",
         "bit": bit,
         "flipped_at": flipped_at.isoformat(),
         "backend": p.get("backend"),
-        "qubit": p.get("qubit"),
+        # A certified batch comes from a pair of qubits, named in `qubits` instead.
+        "qubit": None if certified else p.get("qubit"),
         "job_id": p.get("job_id"),
         "run": p.get("run"),
         "harvested_at": p.get("added_at"),
@@ -228,4 +239,17 @@ def receipt(draw: Draw, flipped_at: datetime) -> dict[str, Any]:
         "extractor": "toeplitz",
         "entropy_per_bit": p.get("entropy_per_bit"),
         "epsilon": p.get("epsilon"),
+        "certified": certified,
     }
+    if certified:
+        flip["certificate"] = {
+            "qubits": p.get("qubits"),
+            "s": p.get("s"),
+            "s_low": p.get("s_low"),
+            "s_epsilon": p.get("s_epsilon"),
+            "rate_per_round": p.get("rate_per_round"),
+            "settings_batches": [
+                source["batch"] for source in p.get("settings_source", {}).get("pool", [])
+            ],
+        }
+    return flip
