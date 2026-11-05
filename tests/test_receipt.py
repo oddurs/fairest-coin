@@ -12,19 +12,36 @@ from tests.test_harvest import SHOTS, FakeTransport, calibration  # noqa: F401 -
 
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA = json.loads((ROOT / "docs" / "receipt.schema.json").read_text())
-TYPES = {"string": str, "integer": int, "number": (int, float), "object": dict}
+TYPES = {
+    "string": str,
+    "integer": int,
+    "number": (int, float),
+    "object": dict,
+    "array": list,
+    "boolean": bool,
+    "null": type(None),
+}
+
+
+def _is(value: Any, name: str) -> bool:
+    # bool is an int in Python, but not in JSON.
+    return isinstance(value, TYPES[name]) and (name == "boolean") == isinstance(value, bool)
 
 
 def validate(value: Any, schema: dict[str, Any]) -> list[str]:
-    """The parts of JSON Schema the receipt schema uses: type, enum, required, properties,
-    additionalProperties. Enough to hold the output to the document, without a dependency."""
+    """The parts of JSON Schema the receipt schema uses: type (one or a list), enum,
+    required, properties, additionalProperties, items. Enough to hold the output to the
+    document, without a dependency."""
     problems = []
-    expected = TYPES[schema["type"]]
-    if not isinstance(value, expected) or isinstance(value, bool):
+    names = schema["type"] if isinstance(schema["type"], list) else [schema["type"]]
+    if not any(_is(value, name) for name in names):
         return [f"{value!r} is not {schema['type']}"]
+    if isinstance(value, list):
+        for i, item in enumerate(value):
+            problems += [f"[{i}]: {p}" for p in validate(item, schema["items"])]
     if "enum" in schema and value not in schema["enum"]:
         problems.append(f"{value!r} not in {schema['enum']}")
-    if schema["type"] == "object":
+    if isinstance(value, dict):
         problems += [f"missing {k}" for k in schema.get("required", []) if k not in value]
         if schema.get("additionalProperties") is False:
             problems += [f"unexpected {k}" for k in value if k not in schema["properties"]]
@@ -124,3 +141,74 @@ def test_a_receipt_is_for_one_bit(tmp_path: Path) -> None:
     (draw,) = pool.take(2)
     with pytest.raises(ValueError, match="one flip"):
         receipt(draw, datetime.now(UTC))
+
+
+def test_a_plain_receipt_says_it_is_not_certified(
+    harvested: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code, out, _ = flip(["--json"], capsys)
+    assert code == 0
+    assert json.loads(out)["certified"] is False
+    assert "certificate" not in json.loads(out)
+    code, out, _ = flip([], capsys)
+    assert "not Bell-certified" in out
+
+
+def certified_pool(tmp_path: Path) -> Path:
+    """A pool holding one certified batch, from a CHSH run whose settings it supplied."""
+    import numpy as np  # noqa: PLC0415
+
+    from coin import certify  # noqa: PLC0415
+    from tests.test_certify import chsh_run  # noqa: PLC0415
+    from tests.test_sweep import SweepTransport  # noqa: PLC0415
+
+    run_dir, pool = chsh_run(tmp_path, SweepTransport(np.random.default_rng(20)), 4000)
+    certify.certify(run_dir, pool)
+    return tmp_path / "pool"
+
+
+def test_a_certified_receipt_carries_its_certificate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from coin import chsh  # noqa: PLC0415
+
+    monkeypatch.setattr(chsh, "INTERVAL_DRAWS", 20)
+    pool = certified_pool(tmp_path)
+    code, out, err = flip(["--certified", "--json", "--pool", str(pool)], capsys)
+    assert code == 0, err
+    receipt_ = json.loads(out)
+    assert validate(receipt_, SCHEMA) == []
+    assert receipt_["certified"] is True
+    assert receipt_["qubit"] is None
+    certificate = receipt_["certificate"]
+    assert certificate["qubits"] == [2, 3]
+    assert certificate["s_low"] > 2
+    assert certificate["settings_batches"]
+    code, out, _ = flip(["--certified", "--pool", str(pool)], capsys)
+    assert "Bell-certified: S = " in out
+    assert "qubits 2, 3" in out
+
+
+def test_plain_and_certified_bits_are_never_mixed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from coin import chsh  # noqa: PLC0415
+
+    monkeypatch.setattr(chsh, "INTERVAL_DRAWS", 20)
+    pool = certified_pool(tmp_path)
+    # The only plain bits went to the run's settings; certified ones are kept apart.
+    code, _, err = flip(["--pool", str(pool)], capsys)
+    assert code == 1
+    assert "0 unspent bit(s)" in err
+    remaining = sum(b.remaining for b in Pool(pool).status() if b.provenance.get("certified"))
+    code, _, _ = flip(["--certified", "--shots", str(remaining), "--pool", str(pool)], capsys)
+    assert code == 0
+    code, _, err = flip(["--certified", "--pool", str(pool)], capsys)
+    assert code == 1
+    assert "0 unspent certified bit(s), 1 needed; run `coin certify`" in err
+
+
+def test_certified_is_for_pool_bits(capsys: pytest.CaptureFixture[str]) -> None:
+    code, _, err = flip(["--sim", "--certified"], capsys)
+    assert code == 2
+    assert "not --sim" in err

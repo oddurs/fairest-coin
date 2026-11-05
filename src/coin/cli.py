@@ -272,6 +272,11 @@ def _add_flip(commands: Any) -> None:
         help="seed the simulator's generator to replay a run",
     )
     flip.add_argument("--pool", type=Path, metavar="DIR", help=f"the entropy pool (${POOL_ENV})")
+    flip.add_argument(
+        "--certified",
+        action="store_true",
+        help="spend only bits a Bell violation certified (see `coin certify`)",
+    )
     output = flip.add_mutually_exclusive_group()
     output.add_argument(
         "--json",
@@ -301,8 +306,8 @@ def _flip(args: argparse.Namespace) -> int:
     if args.json:
         print("coin flip: --json is a hardware flip's receipt; --sim has none", file=sys.stderr)
         return 2
-    if args.pool is not None:
-        print("coin flip: --pool is for pool bits; it cannot go with --sim", file=sys.stderr)
+    if args.pool is not None or args.certified:
+        print("coin flip: --pool and --certified are for pool bits, not --sim", file=sys.stderr)
         return 2
     rng = np.random.default_rng(args.seed)
     if args.shots is None:
@@ -317,6 +322,22 @@ def _flip(args: argparse.Namespace) -> int:
     return 0
 
 
+def _certificate_line(flip: dict[str, Any]) -> str:
+    """What the bit's randomness rests on: a Bell violation, or the hardware's noise."""
+    if not flip["certified"]:
+        return (
+            f"  Toeplitz extraction at {flip['entropy_per_bit']:.4f} bits per shot, "
+            f"ε = {flip['epsilon']:.1e} if the estimate holds · not Bell-certified"
+        )
+    c = flip["certificate"]
+    return (
+        f"  Bell-certified: S = {c['s']:.3f}, S_low = {c['s_low']:.3f} at ε = "
+        f"{c['s_epsilon']:.1e} on qubits {c['qubits'][0]}, {c['qubits'][1]}; "
+        f"{c['rate_per_round']:.3f} bits a round, hashed with ε = {flip['epsilon']:.1e}; "
+        f"settings from {', '.join(c['settings_batches'])}"
+    )
+
+
 def _flip_from_pool(args: argparse.Namespace) -> int:
     if args.seed is not None:
         print("coin flip: --seed replays the simulator; it needs --sim", file=sys.stderr)
@@ -325,7 +346,7 @@ def _flip_from_pool(args: argparse.Namespace) -> int:
         print("coin flip: --json and --quiet describe one flip; leave out --shots", file=sys.stderr)
         return 2
     try:
-        draws = Pool(args.pool).take(args.shots or 1)
+        draws = Pool(args.pool).take(args.shots or 1, certified=args.certified)
     except EmptyPoolError as error:
         print(f"coin flip: {error}", file=sys.stderr)
         return 1
@@ -342,18 +363,20 @@ def _flip_from_pool(args: argparse.Namespace) -> int:
             print(flip["outcome"])
         else:
             print(flip["outcome"])
+            source = (
+                f"qubit {flip['qubit']}"
+                if flip["qubit"] is not None
+                else "qubits " + ", ".join(str(q) for q in flip["certificate"]["qubits"])
+            )
             print(
-                f"  {flip['backend']} · qubit {flip['qubit']} · job {flip['job_id']} · "
+                f"  {flip['backend']} · {source} · job {flip['job_id']} · "
                 f"harvested {str(flip['harvested_at'])[:10]}"
             )
             print(
                 f"  run {flip['run']} · bit {flip['offset'] + 1:,} of {flip['batch_bits']:,} "
                 f"in batch {flip['batch']}"
             )
-            print(
-                f"  Toeplitz extraction at {flip['entropy_per_bit']:.4f} bits per shot, "
-                f"ε = {flip['epsilon']:.1e} if the estimate holds"
-            )
+            print(_certificate_line(flip))
         return 0
     width = len(f"{args.shots:,}")
     for outcome, face in FACES.items():
