@@ -160,3 +160,116 @@ def test_the_two_qubit_depolarizing_channel_scrambles_completely_at_p_1() -> Non
     channel = pair_depolarizing(1.0, (0, 1))
     out = sum(_conjugate(rho, k, channel.qubits, 2) for k in channel.kraus)
     assert np.allclose(np.asarray(out).reshape(4, 4), np.eye(4) / 4, atol=EXACT)
+
+
+# ─── S from counts ───────────────────────────────────────────────────────────────────────
+
+SETTINGS = [(i, j) for i in (0, 1) for j in (0, 1)]
+
+
+def quantum_counts(
+    shots: int, rng: np.random.Generator, visibility: float = 1.0
+) -> dict[tuple[int, int], dict[str, int]]:
+    """Each setting's counts from the simulated Bell pair, depolarized to `visibility`."""
+    from coin.noise import pair_depolarizing  # noqa: PLC0415
+    from coin.sim import sample  # noqa: PLC0415
+
+    def noise(op: object) -> tuple[Any, ...]:
+        # Right after the cz the pair is (|00⟩ + |11⟩)/√2; scrambling it with probability
+        # 1 − V leaves V·ρ + (1 − V)·I/4, whose every correlation is V times the ideal.
+        if getattr(op, "name", None) == "cz":
+            return (pair_depolarizing(1 - visibility, (0, 1)),)
+        return ()
+
+    return {
+        (i, j): sample(lower(chsh.circuit(chsh.ALICE[i], chsh.BOB[j])), shots, rng, noise)
+        for i, j in SETTINGS
+    }
+
+
+def test_an_ideal_bell_pair_gives_tsirelsons_bound_within_sampling_error() -> None:
+    result = chsh.estimate(quantum_counts(20_000, np.random.default_rng(1)))
+    assert abs(result.s - chsh.TSIRELSON) < 4 * result.standard_error
+    assert result.rounds == 80_000
+
+
+@pytest.mark.parametrize("visibility", [0.95, 0.8, 0.6, 0.3])
+def test_a_depolarized_pair_gives_s_times_its_visibility(visibility: float) -> None:
+    result = chsh.estimate(quantum_counts(20_000, np.random.default_rng(2), visibility))
+    assert abs(result.s - chsh.TSIRELSON * visibility) < 4 * result.standard_error
+
+
+def test_the_standard_error_is_the_binomial_one() -> None:
+    # E = 0.5 from 100 shots per setting: each variance (1 − 0.25)/100, four of them.
+    counts = {setting: {"00": 75, "01": 25} for setting in SETTINGS}
+    result = chsh.estimate(counts)
+    assert result.s == pytest.approx(0.5 + 0.5 + 0.5 - 0.5)
+    assert result.standard_error == pytest.approx(math.sqrt(4 * 0.75 / 100))
+
+
+def local_counts(
+    rounds: int, rng: np.random.Generator, strategies: list[tuple[tuple[int, int], tuple[int, int]]]
+) -> dict[tuple[int, int], dict[str, int]]:
+    """A local hidden-variable model: each round a hidden strategy is drawn, shared by both
+    sides in advance, and each answers from it and its own setting alone. Settings are drawn
+    uniformly each round, as the game requires."""
+    counts: dict[tuple[int, int], dict[str, int]] = {s: {} for s in SETTINGS}
+    chosen = rng.integers(0, len(strategies), rounds)
+    settings = rng.integers(0, 2, (rounds, 2))
+    for k, (i, j) in zip(chosen.tolist(), settings.tolist(), strict=True):
+        alice, bob = strategies[k]
+        outcome = f"{bob[j]}{alice[i]}"
+        counts[i, j][outcome] = counts[i, j].get(outcome, 0) + 1
+    return counts
+
+
+DETERMINISTIC = [
+    ((a0, a1), (b0, b1)) for a0 in (0, 1) for a1 in (0, 1) for b0 in (0, 1) for b1 in (0, 1)
+]
+
+
+@pytest.mark.parametrize("seed", range(5))
+def test_a_local_model_never_exceeds_2_beyond_sampling_error(seed: int) -> None:
+    rng = np.random.default_rng(seed)
+    # A random mixture of all sixteen deterministic strategies, and the best one alone.
+    mixture = [DETERMINISTIC[k] for k in rng.integers(0, 16, 6)]
+    for strategies in (mixture, [((0, 0), (0, 0))]):
+        result = chsh.estimate(local_counts(20_000, rng, strategies))
+        assert result.s <= 2 + 4 * result.standard_error
+
+
+def test_s_low_rarely_exceeds_2_for_a_local_model() -> None:
+    # The best local strategy wins exactly 3/4 of rounds (S = 2). At ε = 0.1, S_low may
+    # exceed 2 in at most a tenth of runs; Hoeffding is conservative, so it should be fewer.
+    rng = np.random.default_rng(7)
+    epsilon, runs = 0.1, 400
+    above = sum(
+        chsh.estimate(local_counts(2_000, rng, [((0, 0), (0, 0))])).lower_bound(epsilon) > 2
+        for _ in range(runs)
+    )
+    assert above <= epsilon * runs
+
+
+def test_s_low_is_below_s_and_tightens_with_rounds() -> None:
+    rng = np.random.default_rng(8)
+    small = chsh.estimate(quantum_counts(500, rng))
+    large = chsh.estimate(quantum_counts(50_000, rng))
+    assert small.lower_bound(1e-6) < small.s
+    assert small.s - small.lower_bound(1e-6) > large.s - large.lower_bound(1e-6)
+    # With 200,000 rounds of an ideal pair, S_low at ε = 2⁻³² still clears 2.
+    assert large.lower_bound(2**-32) > 2
+
+
+def test_estimate_refuses_missing_settings() -> None:
+    with pytest.raises(ValueError, match="all four setting pairs"):
+        chsh.estimate({(0, 0): {"00": 1}})
+    with pytest.raises(ValueError, match="no shots"):
+        chsh.estimate({setting: ({} if setting == (1, 1) else {"00": 1}) for setting in SETTINGS})
+    with pytest.raises(ValueError, match="epsilon"):
+        chsh.estimate({setting: {"00": 1} for setting in SETTINGS}).lower_bound(0)
+
+
+def test_s_low_is_hoeffdings_bound_on_the_win_rate() -> None:
+    # 750 wins in 1,000 rounds at ε = e⁻²: the margin is √(2/2000) and S_low = 8(0.75 − it) − 4.
+    result = chsh.Estimate(s=2.0, standard_error=0.0, rounds=1_000, wins=750)
+    assert result.lower_bound(math.exp(-2)) == pytest.approx(8 * (0.75 - math.sqrt(0.001)) - 4)
