@@ -1,6 +1,6 @@
 [project]
 name = "fairest-coin"
-version = "0.3.2"
+version = "0.4.0"
 description = "Can you prove a coin flip is random? A quantum coin, built from scratch and tested on real IBM hardware."
 readme = "README.md"
 license = "MIT"

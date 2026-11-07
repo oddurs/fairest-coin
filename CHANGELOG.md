@@ -6,6 +6,54 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-06
+
+The certified coin: a Bell test on real hardware, predicted in public first, with settings
+chosen by the coin's own bits, and every certified flip carrying its S value. S = 2.761 ±
+0.020 on `ibm_marrakesh`, with a lower bound of 2.582 at ε = 2⁻³², where no pre-written
+plan exceeds 2. And an honest account: it spends six times the randomness it certifies, and
+every assumption it rests on is named.
+
+### Added
+
+- `coin run bell --backend NAME --shots N (--dry-run | --submit)`: the Bell pair on the
+  best-ranked pair of qubits, predicted first, reporting agreement and each qubit's lean.
+- `coin run chsh`: the CHSH test, one setting per round, all four interleaved in one job.
+  `--predict` writes the whole plan, with S and a 95% interval, to `data/predictions/`;
+  `--submit --prediction FILE` refuses a file git does not hold unchanged, and records the
+  commit. Settings come from the entropy pool, two bits a round.
+- `coin certify RUN` hashes a CHSH run's outcomes at the min-entropy its lower bound
+  certifies, into a certified batch, and reports setting bits in, certified bits out and
+  the net. A run whose bound does not exceed 2 credits nothing.
+- `coin flip --certified` spends only certified bits; receipts say whether a bit is
+  certified and, if so, carry S, S_low, ε, the certified rate, the pair, and the batches
+  that chose the settings. `docs/receipt.schema.json` documents both kinds.
+- `coin predict --pairs [--readout ZERO ONE]` ranks coupled pairs by predicted S.
+- `coin compare` reports Bell and CHSH runs.
+- `coin.chsh`: the CHSH circuits, S and its standard error, a Hoeffding lower bound, a
+  prediction interval, and `rank_pairs`. `coin.bell`, `coin.certify` and `coin.commitment`.
+- `coin.compile`: `cx` lowered to one native `cz`, a check that refuses uncoupled pairs
+  rather than routing them, and `sweep_qasm`, several circuits as one parametrised program.
+- `coin.noise`: two-qubit depolarizing, sized for a gate's reported error, and `pair_gates`.
+- Hardware runs: a Bell pair, a sweep test, two CHSH runs' predictions and one result, and
+  four readout jobs. The certified run and its harvest join the archive when their batches
+  are spent.
+- The CHSH figure, chapter 4 ("Two coins that agree") and chapter 5 ("The proof").
+
+### Changed
+
+- The IBM adapter uses the executor Sampler; SamplerV2 is deprecated. `qiskit-aer` joins
+  the dev group so its tests run the real client-side post-processing offline.
+- `Pool.take` keeps certified and plain bits apart: a plain flip never spends a certified one.
+- Every receipt gains `certified`, and `qubit` is null on a certified bit, which comes from
+  a pair.
+
+### Fixed
+
+- The adapter's circuit-change check compared a flat instruction list, and refused an
+  unchanged two-qubit circuit whose gates Qiskit listed in another order. It now compares
+  each qubit's and classical bit's instructions in order.
+
 ## [0.3.2] - 2026-11-04
 
 Hardening, second pass: what a review of v0.3 as released found, fixed with the test that
@@ -174,7 +222,8 @@ The ideal coin: a quantum coin built from scratch, flipped on a simulator.
 - A test suite that runs every example, code excerpt and command quoted in the chapters
   and the README.
 
-[Unreleased]: https://github.com/oddurs/fairest-coin/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/oddurs/fairest-coin/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/oddurs/fairest-coin/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/oddurs/fairest-coin/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/oddurs/fairest-coin/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/oddurs/fairest-coin/compare/v0.2.0...v0.3.0
