@@ -196,8 +196,9 @@ class ChshPlan:
     interval: tuple[float, float] | None
 
 
-# Spike 0040: a job costs about 2 s, and each swept round about 1 ms (one 2,000-round job).
-_SECONDS_PER_SWEPT_ROUND = 1e-3
+# Measured: 2,000, 12,000 and 22,000 swept rounds were charged 4, 7 and 9 s, in whole seconds.
+_SWEEP_SECONDS = 3.5
+_SECONDS_PER_SWEPT_ROUND = 2.5e-4
 
 
 def random_choices(rounds: int) -> tuple[int, ...]:
@@ -286,7 +287,7 @@ def plan_chsh(
 def chsh_summary(chosen: ChshPlan) -> str:
     a, b = chosen.pair
     rounds = chosen.submission.shots
-    seconds = estimate_qpu_seconds(0) + rounds * _SECONDS_PER_SWEPT_ROUND
+    seconds = _SWEEP_SECONDS + rounds * _SECONDS_PER_SWEPT_ROUND
     interval = (
         f", 95% interval [{chosen.interval[0]:.3f}, {chosen.interval[1]:.3f}]"
         if chosen.interval

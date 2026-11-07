@@ -9,7 +9,7 @@ assignee: Oddur Sigurdsson
 depends_on:
 - 39
 created: 2026-11-01
-updated: 2026-11-05
+updated: 2026-11-06
 closed_at: 2026-11-05
 priority: p0
 effort: s
@@ -75,3 +75,7 @@ Built the path, not a throwaway script, so the test job was predicted and archiv
 ## Result
 
 One parametrised program with a row per round: the four settings share a native skeleton and differ only in free rz angles. 2,000 swept rounds cost 4 QPU s (≈ 2 s + 1 ms per round) and gave S = 2.756 ± 0.065 (predicted 2.777), S_low = 2.160 at ε = 2⁻³². About 1,300 rounds clear 2 at that ε; 11,000 put S_low at 2.5.
+
+## 2026-11-06
+
+Superseded on cost: with 0042's and 0043's jobs (12,000 and 22,000 rounds, 7 and 9 s), a swept job costs about 3.5 s plus 0.25 ms a round, the same per-round rate as a plain shot. The 1 ms above came from one small job with whole-second charges.

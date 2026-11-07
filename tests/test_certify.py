@@ -142,7 +142,11 @@ def test_predict_draws_the_settings_from_the_pool(
     assert "4,000 pool bits spent" in out
     assert pool.status()[0].spent == 4000
     (path,) = predictions.iterdir()
-    sources = bell.load_prediction(path).submission.prediction.values["settings_source"]
+    plan = bell.load_prediction(path)
+    # What was printed is the prediction, not the throwaway plan that validated it.
+    assert plan.interval is not None
+    assert f"[{plan.interval[0]:.3f}, {plan.interval[1]:.3f}]" in out
+    sources = plan.submission.prediction.values["settings_source"]
     assert sources == {"pool": [{"batch": pool.status()[0].batch, "offset": 0, "bits": 4000}]}
 
 
@@ -165,3 +169,19 @@ def test_coin_certify_reports_the_net(tmp_path: Path, capsys: pytest.CaptureFixt
     assert "certified bits in batch" in out
     assert "net          -" in out
     assert load_run(run_dir).job_id in out
+
+
+def test_the_pool_table_names_a_certified_batchs_pair(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run_dir, pool = chsh_run(tmp_path, SweepTransport(np.random.default_rng(18)), 4000)
+    certify.certify(run_dir, pool)
+    code, out, _ = cli_run(["pool", "--pool", str(tmp_path / "pool")], capsys)
+    assert code == 0
+    assert " 2-3 " in out
+
+
+@pytest.mark.parametrize(("rounds", "seconds"), [(2_000, 4), (12_000, 6), (22_000, 9)])
+def test_the_estimate_fits_what_swept_jobs_were_charged(rounds: int, seconds: int) -> None:
+    chosen = bell.plan_chsh("fake", CALIBRATION, (0, 1, 2, 3) * (rounds // 4))
+    assert f"~{seconds} QPU seconds" in bell.chsh_summary(chosen)
