@@ -396,14 +396,14 @@ def _pool(args: argparse.Namespace) -> int:
         return 0
     # Batch names carry the time to the microsecond, so size the column to them.
     w = max(len("batch"), *(len(b.batch) for b in batches))
-    print(f"{'batch':<{w}} {'qubit':>5} {'bits':>8} {'spent':>8} {'remaining':>10}")
+    print(f"{'batch':<{w}} {'qubit':>7} {'bits':>8} {'spent':>8} {'remaining':>10}")
     for b in batches:
-        print(
-            f"{b.batch:<{w}} {b.provenance.get('qubit', '?'):>5} {b.total:>8,} {b.spent:>8,} "
-            f"{b.remaining:>10,}"
-        )
+        # A certified batch comes from a pair, and says so where a harvest names its qubit.
+        pair = b.provenance.get("qubits")
+        source = "-".join(str(q) for q in pair) if pair else b.provenance.get("qubit", "?")
+        print(f"{b.batch:<{w}} {source:>7} {b.total:>8,} {b.spent:>8,} {b.remaining:>10,}")
     print(
-        f"{'total':<{w}} {'':>5} {sum(b.total for b in batches):>8,} "
+        f"{'total':<{w}} {'':>7} {sum(b.total for b in batches):>8,} "
         f"{sum(b.spent for b in batches):>8,} {sum(b.remaining for b in batches):>10,}"
     )
     return 0
@@ -834,8 +834,8 @@ def _chsh_plan(args: argparse.Namespace) -> int:
             pair=pair,
             measured=measured_readout,
         )
-        print(bell.chsh_summary(chosen))
         if args.dry_run:
+            print(bell.chsh_summary(chosen))
             print("dry run: nothing written, nothing submitted, no pool bit spent")
             return 0
         if chosen.interval is None:
@@ -851,6 +851,9 @@ def _chsh_plan(args: argparse.Namespace) -> int:
         }
         prediction = replace(chosen.submission.prediction, values=values)
         chosen = replace(chosen, submission=replace(chosen.submission, prediction=prediction))
+        # Printed only now: the interval's seed comes from the settings, so the throwaway
+        # plan's interval is not the prediction's.
+        print(bell.chsh_summary(chosen))
         print(f"settings     {len(choices) * certify.BITS_PER_ROUND:,} pool bits spent")
         path = bell.save_prediction(chosen, args.predictions_dir)
     except ImportError as error:
