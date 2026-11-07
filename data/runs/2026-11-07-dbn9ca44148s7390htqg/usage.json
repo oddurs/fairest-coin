@@ -1,0 +1,16 @@
+{
+  "details": [
+    {
+      "metric": {
+        "id": "caffe3ca-729c-5750-8777-df63bbf8bfd9",
+        "value": 5
+      },
+      "unit": "resource_units",
+      "value": 0.073272
+    }
+  ],
+  "qpu_charge_time_seconds": 5,
+  "status": "pending",
+  "unit": "resource_units",
+  "value": 0.073272
+}
