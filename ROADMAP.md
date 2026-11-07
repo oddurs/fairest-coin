@@ -112,7 +112,7 @@ v0.3.2: every defect found by the review of v0.3 as released is fixed: a committ
 
 A Bell test run on real hardware, with the measurement settings chosen by the v0.3 coin,
 
-### backlog
+### in progress
 
 - [ ] [`0048`](https://github.com/oddurs/fairest-coin/blob/main/cairn/items/0048-cut-v0-4-0.md) Cut v0.4.0 <sup>chore · p0 · tooling</sup>
 
