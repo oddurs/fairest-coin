@@ -64,6 +64,11 @@ On real hardware (an IBM Quantum account; QPU time is spent only with `--submit`
   `coin predict --pairs` ranks the pairs.
   [Chapter 4](docs/chapters/04-two-coins-that-agree.md) is what happened, and why agreeing
   coins prove nothing yet.
+- `coin run chsh` runs the CHSH test: `--predict` writes the plan and predicted S to a file,
+  which must be committed before `--submit` will run it. `coin certify` hashes a run's
+  outcomes at the rate its violation certifies, and `coin flip --certified` spends those
+  bits, with a receipt carrying S. [Chapter 5](docs/chapters/05-the-proof.md) is the result,
+  what it costs, and what it does not prove.
 
 ## The chapters
 
@@ -74,7 +79,7 @@ On real hardware (an IBM Quantum account; QPU time is spent only with `--submit`
 | [2. Predict the real coin](docs/chapters/02-predict-the-real-coin.md) | How does real hardware bend it? | written |
 | [3. Make it fair](docs/chapters/03-make-it-fair.md) | Can a biased coin be fixed? | written |
 | [4. Two coins that agree](docs/chapters/04-two-coins-that-agree.md) | What is entanglement for? | written |
-| 5. The proof | Can randomness be certified? | upcoming in v0.4 |
+| [5. The proof](docs/chapters/05-the-proof.md) | Can randomness be certified? | written |
 | Epilogue | What would it really take? | upcoming in v1.0 |
 
 Every Python example, code excerpt and command shown with its output in the chapters is
