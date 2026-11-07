@@ -12,7 +12,7 @@ depends_on:
 - 32
 - 42
 created: 2026-11-01
-updated: 2026-11-05
+updated: 2026-11-06
 priority: p0
 effort: m
 area: chsh
@@ -49,3 +49,7 @@ it is negative and why.
 ## 2026-11-05
 
 Code first, in its own PR. coin.certify: settings_from_pool (two pool bits a round, choice 2a + b; records batch, offset and count; the bits are spent), certified_rate (Pironio et al. 2010: 1 − log₂(1 + √(2 − S²/4)), 0 at S ≤ 2, 1 at 2√2; 0.268 at 2.5, 0.493 at 2.7), certify (refuses a run whose settings did not come from the pool, one already published, and in the CLI one git tracks; S_low ≤ 2 credits nothing; else the run's two outcome bits a round are Toeplitz-hashed at rate/2 per bit, ⌊n·rate⌋ − 64 bits out, pooled as a certified batch with S, S_low, ε, the rate and the settings' source), and report (setting bits in, certified bits out, net, and that it does not expand randomness). coin run chsh --predict now draws settings from the pool after validating the plan with throwaway settings, so a plan that cannot run spends nothing; --dry-run never spends. coin certify RUN. A certified run, like a harvest, is committed only once its batch is spent (coin publish works for it unchanged). Six mutants replayed, all killed. Still to come: the fresh harvest, the run, its certification (hardware, owner).
+
+## 2026-11-06
+
+Hardware session, 2026-11-07 UTC, run on the owner's go-ahead. Harvest: 100,000 shots on qubit 8, 44,920 bits, min-entropy estimate 0.8997 per shot, kept outside git in ~/.local/share/fairest-coin/runs/2026-11-07-dbn986c4148s7390hohg until its batch is spent. Readout, 10,000 shots each way: data/runs/2026-11-07-dbn9c3k4148s7390htjg and -dbn9ca44148s7390htqg (34 and 43 of 156 qubits within 3σ of published). Prediction: data/predictions/2026-11-07T030927-chsh-ibm_marrakesh.json.gz, pair 153-154, 22,000 rounds, S = 2.755 ± 0.020, 95% interval [2.715, 2.796], settings from 44,000 bits of that batch (920 remain). The CLI printed [2.717, 2.789], the interval of its throwaway validating plan; the file is the prediction.
